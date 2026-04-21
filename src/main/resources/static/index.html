@@ -77,6 +77,12 @@
             border-bottom: 2px solid #171717;
             padding-bottom: 0.8rem;
         }
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            min-width: 0;
+        }
         .resources, .row, .tabs { display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; }
         .resources { color: #3b3831; }
         .layout { display: grid; grid-template-columns: 190px minmax(0, 1fr) 230px; gap: 1rem; align-items: start; }
@@ -257,9 +263,12 @@
 
     <main v-else>
         <header class="topbar">
-            <div>
-                <h2>{{ save.party[0]?.name }}的修仙路</h2>
-                <div class="muted">{{ save.currentArea }} · 锁妖塔第 {{ save.towerFloor }} 层</div>
+            <div class="topbar-left">
+                <button @click="screen = 'menu'">返回主菜单</button>
+                <div>
+                    <h2>{{ save.party[0]?.name }}的修仙路</h2>
+                    <div class="muted">{{ save.currentArea }} · 锁妖塔第 {{ save.towerFloor }} 层</div>
+                </div>
             </div>
             <div class="resources">
                 <span>灵石 {{ save.resources.spiritStones }}</span>
@@ -280,7 +289,6 @@
                 <button :class="{active: tab === 'realm'}" @click="tab = 'realm'">渡劫</button>
                 <button :class="{active: tab === 'companions'}" @click="tab = 'companions'">道友</button>
                 <button :class="{active: tab === 'codex'}" @click="tab = 'codex'">图鉴</button>
-                <button @click="screen = 'menu'">主菜单</button>
             </aside>
 
             <section class="panel">
