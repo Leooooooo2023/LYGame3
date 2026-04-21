@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>凡人修仙外传 v0.1</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            color: #171717;
+            background: radial-gradient(circle at 20% 8%, rgba(0, 0, 0, 0.08), transparent 24rem), linear-gradient(135deg, #f8f8f5 0%, #e8e5de 100%);
+            font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+        }
+        button, input, select { font: inherit; }
+        button {
+            min-height: 2.35rem;
+            padding: 0.55rem 0.85rem;
+            border: 1px solid #242424;
+            background: #faf9f4;
+            color: #171717;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease;
+        }
+        button:hover { background: #e8e4da; transform: translateY(-1px); }
+        button:disabled { cursor: not-allowed; opacity: 0.5; transform: none; }
+        input, select {
+            width: 100%;
+            border: 1px solid #242424;
+            background: rgba(255, 255, 255, 0.72);
+            padding: 0.65rem 0.75rem;
+        }
+        h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: 0; }
+        h1 { font-size: clamp(2.2rem, 6vw, 4.6rem); line-height: 1.05; }
+        .app { max-width: 1320px; margin: 0 auto; padding: 1.2rem; }
+        .menu { min-height: calc(100vh - 2.4rem); display: grid; place-items: center; }
+        .title-block {
+            width: min(560px, 100%);
+            text-align: center;
+            border: 2px solid #171717;
+            background: rgba(248, 247, 241, 0.84);
+            padding: 2.4rem;
+            box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.12);
+        }
+        .subtitle { margin: 1rem 0 1.8rem; color: #555047; }
+        .stack, .list { display: grid; gap: 0.8rem; }
+        .form { max-width: 520px; margin: 0 auto; }
+        .form label { display: grid; gap: 0.35rem; color: #3b3831; text-align: left; }
+        .story-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #050505;
+            color: #f8f8f8;
+            padding: 1.5rem;
+        }
+        .story-box { width: min(820px, 100%); line-height: 2; font-size: 1.05rem; }
+        .story-box h2 { margin-bottom: 1.5rem; }
+        .story-box p { margin: 0 0 1rem; }
+        .story-box button {
+            margin-top: 1.2rem;
+            border-color: #f8f8f8;
+            background: #050505;
+            color: #f8f8f8;
+        }
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            border-bottom: 2px solid #171717;
+            padding-bottom: 0.8rem;
+        }
+        .resources, .row, .tabs { display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center; }
+        .resources { color: #3b3831; }
+        .layout { display: grid; grid-template-columns: 190px minmax(0, 1fr) 230px; gap: 1rem; align-items: start; }
+        .panel, .card {
+            border: 1px solid #252525;
+            background: rgba(255, 254, 248, 0.78);
+            padding: 1rem;
+        }
+        .card { background: rgba(255, 255, 255, 0.62); min-width: 0; }
+        .nav { display: grid; gap: 0.55rem; }
+        .nav button.active, .tabs button.active { background: #171717; color: #fffdf7; }
+        .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.85rem; }
+        .two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .avatar {
+            width: 52px;
+            height: 52px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 0.65rem;
+            border: 1px solid #171717;
+            background: radial-gradient(circle, #fff 0%, #d7d1c5 100%);
+            font-size: 1.35rem;
+            font-weight: 700;
+        }
+        .muted { color: #655f55; font-size: 0.92rem; }
+        .desc { color: #4d4840; line-height: 1.65; margin: 0.45rem 0; }
+        .meter { height: 9px; border: 1px solid #171717; background: #ded9ce; margin: 0.35rem 0 0.55rem; }
+        .meter span { display: block; height: 100%; background: #171717; }
+        .message {
+            margin: 0 0 1rem;
+            padding: 0.75rem 0.9rem;
+            border-left: 4px solid #171717;
+            background: rgba(255, 255, 255, 0.62);
+        }
+        .log {
+            max-height: 420px;
+            overflow: auto;
+            white-space: pre-wrap;
+            line-height: 1.7;
+            background: #111;
+            color: #f7f4eb;
+            padding: 1rem;
+            border: 1px solid #111;
+        }
+        .modal-mask {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 10;
+        }
+        .modal {
+            width: min(480px, 100%);
+            border: 2px solid #171717;
+            background: #fffdf7;
+            padding: 1.2rem;
+            box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.22);
+        }
+        .battlefield { display: grid; gap: 1rem; }
+        .battle-side {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 0.75rem;
+        }
+        .unit {
+            border: 1px solid #171717;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 0.75rem;
+            min-height: 155px;
+        }
+        .unit.dead { opacity: 0.48; filter: grayscale(1); }
+        .unit.current { outline: 3px solid #171717; }
+        .action-panel {
+            border: 2px solid #171717;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 1rem;
+        }
+        .target-button {
+            width: 100%;
+            text-align: left;
+        }
+        .compact-card {
+            border: 1px solid #252525;
+            background: rgba(255, 255, 255, 0.58);
+            padding: 0.7rem;
+        }
+        .quality-凡品 { color: #5d5d5d; }
+        .quality-良品 { color: #247a3d; }
+        .quality-精品 { color: #1f63a8; }
+        .quality-灵品 { color: #7a3ba5; }
+        .quality-仙品 { color: #b35a13; }
+        @media (max-width: 980px) {
+            .layout { grid-template-columns: 1fr; }
+            .nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .grid, .two, .battle-side { grid-template-columns: 1fr; }
+            .topbar { align-items: flex-start; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+<div id="app" class="app">
+    <main v-if="screen === 'menu'" class="menu">
+        <section class="title-block">
+            <h1>凡人修仙外传</h1>
+            <p class="subtitle">v0.1 网页端单机修仙回合制</p>
+            <div class="stack">
+                <button @click="screen = 'create'">新的旅程</button>
+                <button @click="openLoad">读取进度</button>
+                <button @click="screen = 'about'">关于游戏</button>
+                <button @click="message = '网页端游戏可直接关闭浏览器离开。'">离开游戏</button>
+            </div>
+        </section>
+    </main>
+
+    <main v-else-if="screen === 'create'" class="menu">
+        <section class="title-block form">
+            <h2>角色创建</h2>
+            <p class="subtitle">一名散修，从太南山启程。</p>
+            <div class="stack">
+                <label>角色名称
+                    <input v-model.trim="createForm.name" maxlength="8" placeholder="1-8字">
+                </label>
+                <label>性别
+                    <select v-model="createForm.gender">
+                        <option>男</option>
+                        <option>女</option>
+                    </select>
+                </label>
+                <label>五行属性
+                    <select v-model="createForm.element">
+                        <option v-for="element in elements" :key="element">{{ element }}</option>
+                    </select>
+                </label>
+                <button @click="createGame">开始游戏</button>
+                <button @click="screen = 'menu'">返回</button>
+            </div>
+        </section>
+    </main>
+
+    <main v-else-if="screen === 'story'" class="story-screen">
+        <section class="story-box">
+            <h2>太南山下，无名散修</h2>
+            <p>大晋边陲有山，名太南。山中灵气稀薄，却常有残破洞府、旧日禁制、妖兽足迹隐现其间。</p>
+            <p>你原本只是山脚小镇中不起眼的凡人，偶然在一场夜雨后拾得半卷残诀。残诀纸页焦黑，字迹却如新墨，开篇只有一句：</p>
+            <p>“仙路不问出身，只问敢不敢向前一步。”</p>
+            <p>今夜，你带着一柄青竹剑、数枚丹药和一袋灵石，独自踏入太南山。无人护道，无宗门庇佑，也没有道友同行。</p>
+            <p>从这一刻起，生死、机缘、境界，皆由你自己争来。</p>
+            <button @click="enterGame">踏入太南山</button>
+        </section>
+    </main>
+
+    <main v-else-if="screen === 'load'" class="menu">
+        <section class="title-block">
+            <h2>读取进度</h2>
+            <p class="subtitle">选择一个自动存档继续。</p>
+            <div class="stack" v-if="saves.length">
+                <button v-for="save in saves" :key="save.id" @click="selectSave(save.id)">
+                    {{ save.party[0]?.name }} · {{ save.party[0]?.realm }}{{ save.party[0]?.realmLevel }}级 · 锁妖塔{{ save.towerFloor }}层
+                </button>
+            </div>
+            <p v-else class="muted">还没有存档。</p>
+            <button style="margin-top: 1rem" @click="screen = 'menu'">返回</button>
+        </section>
+    </main>
+
+    <main v-else-if="screen === 'about'" class="menu">
+        <section class="title-block">
+            <h2>关于游戏</h2>
+            <p class="subtitle">开发者：李涌 · 版本：v0.1 · 发布目标：可玩的修仙成长闭环</p>
+            <div class="stack">
+                <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、境界突破、装备丹药收集。</p>
+                <button @click="screen = 'menu'">返回</button>
+            </div>
+        </section>
+    </main>
+
+    <main v-else>
+        <header class="topbar">
+            <div>
+                <h2>{{ save.party[0]?.name }}的修仙路</h2>
+                <div class="muted">{{ save.currentArea }} · 锁妖塔第 {{ save.towerFloor }} 层</div>
+            </div>
+            <div class="resources">
+                <span>灵石 {{ save.resources.spiritStones }}</span>
+                <span>五行精华 {{ save.resources.fiveElementEssence }}</span>
+                <span>突破丹 {{ save.resources.breakthroughPill }}</span>
+            </div>
+        </header>
+
+        <p v-if="message" class="message">{{ message }}</p>
+
+        <div class="layout">
+            <aside class="panel nav">
+                <button :class="{active: tab === 'home'}" @click="tab = 'home'">主界面</button>
+                <button :class="{active: tab === 'bag'}" @click="tab = 'bag'">包裹</button>
+                <button :class="{active: tab === 'shop'}" @click="tab = 'shop'">坊市</button>
+                <button :class="{active: tab === 'equip'}" @click="tab = 'equip'">装备</button>
+                <button :class="{active: tab === 'realm'}" @click="tab = 'realm'">渡劫</button>
+                <button :class="{active: tab === 'companions'}" @click="tab = 'companions'">道友</button>
+                <button :class="{active: tab === 'codex'}" @click="tab = 'codex'">图鉴</button>
+                <button @click="screen = 'menu'">主菜单</button>
+            </aside>
+
+            <section class="panel">
+                <template v-if="battle && !battle.finished">
+                    <div class="battlefield">
+                        <div>
+                            <h3>{{ battle.title }}</h3>
+                            <p class="muted">第 {{ battle.round }} 回合 · 当前行动：{{ currentActor?.name || '等待' }}</p>
+                        </div>
+
+                        <section>
+                            <h3>敌方单位</h3>
+                            <div class="battle-side" style="margin-top: 0.65rem">
+                                <article class="unit" v-for="enemy in battle.enemies" :key="enemy.id" :class="{dead: enemy.hp <= 0}">
+                                    <h3>{{ enemy.name }}</h3>
+                                    <p class="muted">{{ enemy.element }}属性 · 等级 {{ enemy.level }}</p>
+                                    <div class="meter"><span :style="{width: percent(enemy.hp, enemy.maxHp) + '%'}"></span></div>
+                                    <div>体力 {{ enemy.hp }}/{{ enemy.maxHp }}</div>
+                                    <div class="meter"><span :style="{width: percent(enemy.mp, enemy.maxMp) + '%'}"></span></div>
+                                    <div>灵力 {{ enemy.mp }}/{{ enemy.maxMp }}</div>
+                                    <p class="muted">状态：{{ statusText(enemy) }}</p>
+                                </article>
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3>我方单位</h3>
+                            <div class="battle-side" style="margin-top: 0.65rem">
+                                <article class="unit" v-for="role in battle.save.party" :key="role.id" :class="{dead: role.hp <= 0, current: role.id === battle.currentActorId}">
+                                    <h3>{{ role.name }}</h3>
+                                    <p class="muted">{{ role.element }}属性 · {{ role.realm }}{{ role.realmLevel }}级</p>
+                                    <div class="meter"><span :style="{width: percent(role.hp, role.maxHp) + '%'}"></span></div>
+                                    <div>体力 {{ role.hp }}/{{ role.maxHp }}</div>
+                                    <div class="meter"><span :style="{width: percent(role.mp, role.maxMp) + '%'}"></span></div>
+                                    <div>灵力 {{ role.mp }}/{{ role.maxMp }}</div>
+                                    <p class="muted">状态：{{ statusText(role) }}</p>
+                                </article>
+                            </div>
+                        </section>
+
+                        <section class="action-panel">
+                            <h3>{{ currentActor?.name }} 行动</h3>
+                            <p class="muted">选择行动后，再指定目标。</p>
+                            <div class="row" style="margin-top: 0.8rem">
+                                <button @click="setPendingAttack">普通攻击</button>
+                                <button @click="battleActionMode = battleActionMode === 'skills' ? null : 'skills'">技能</button>
+                                <button @click="battleActionMode = battleActionMode === 'items' ? null : 'items'">丹药</button>
+                                <button @click="submitBattleAction({action: 'escape'})">逃跑</button>
+                            </div>
+
+                            <div v-if="battleActionMode === 'skills'" class="grid two" style="margin-top: 1rem">
+                                <button class="target-button" v-for="skillId in currentActor?.skills || []" :key="skillId" @click="setPendingSkill(skillId)" :disabled="currentActor && currentActor.mp < skill(skillId).mpCost">
+                                    <strong>{{ skillName(skillId) }}</strong><br>
+                                    <span class="muted">{{ skillDescription(skillId) }}</span>
+                                </button>
+                            </div>
+
+                            <div v-if="battleActionMode === 'items'" class="grid two" style="margin-top: 1rem">
+                                <button class="target-button" v-for="(count, id) in battle.save.inventory" :key="id" @click="setPendingItem(id)" :disabled="item(id).category !== 'pill'">
+                                    <strong>{{ itemName(id) }} ×{{ count }}</strong><br>
+                                    <span class="muted">{{ itemEffect(id) }}</span>
+                                </button>
+                            </div>
+
+                            <div v-if="pendingAction" style="margin-top: 1rem">
+                                <h3>选择目标</h3>
+                                <div class="grid two" style="margin-top: 0.65rem">
+                                    <button class="target-button" v-for="target in pendingTargets" :key="target.id" @click="submitBattleTarget(target.id)" :disabled="target.hp <= 0">
+                                        {{ target.name }} · 体力 {{ target.hp }}/{{ target.maxHp }} · 灵力 {{ target.mp }}/{{ target.maxMp }}
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section>
+                            <h3>战斗日志</h3>
+                            <div class="log">{{ battle.logs.join('\n') }}</div>
+                        </section>
+                    </div>
+                </template>
+
+                <template v-else-if="battle && battle.finished">
+                    <h3>{{ battle.title }}</h3>
+                    <p>{{ battle.victory ? '战斗胜利' : battle.escaped ? '成功撤退' : '战斗失败' }}</p>
+                    <p v-if="battle.victory" class="muted">获得灵石 {{ battle.spiritStones }}，五行精华 {{ battle.essence }}，经验 {{ battle.exp }}。</p>
+                    <p v-if="battle.postBattleEvent" class="message">{{ battle.postBattleEvent }}</p>
+                    <div class="log">{{ battle.logs.join('\n') }}</div>
+                    <div class="row" style="margin-top: 1rem">
+                        <button @click="closeBattle">返回主界面</button>
+                    </div>
+                </template>
+
+                <template v-else-if="tab === 'home'">
+                    <h3>出战角色</h3>
+                    <p class="muted" style="margin-bottom: 0.85rem">当前阵容 {{ save.party.length }}/3，探索地图有机会结识道友。</p>
+                    <div class="grid">
+                        <article class="card" v-for="role in save.party" :key="role.id">
+                            <div class="avatar">{{ role.element }}</div>
+                            <h3>{{ role.name }}</h3>
+                            <div class="muted">{{ role.realm }}{{ role.realmLevel }}级 · 等级 {{ role.level }}</div>
+                            <div class="meter"><span :style="{width: percent(role.exp, role.nextExp) + '%'}"></span></div>
+                            <div>经验 {{ role.exp }}/{{ role.nextExp }}</div>
+                            <div class="meter"><span :style="{width: percent(role.hp, role.maxHp) + '%'}"></span></div>
+                            <div>体力 {{ role.hp }}/{{ role.maxHp }}</div>
+                            <div class="meter"><span :style="{width: percent(role.mp, role.maxMp) + '%'}"></span></div>
+                            <div>灵力 {{ role.mp }}/{{ role.maxMp }}</div>
+                            <p class="muted">武力 {{ stat(role, 'attack') }} 法力 {{ stat(role, 'magic') }} 防御 {{ stat(role, 'defense') }} 敏捷 {{ stat(role, 'agility') }}</p>
+                            <div class="list">
+                                <p class="muted" v-for="skillId in role.skills" :key="skillId">
+                                    {{ skillName(skillId) }}：{{ skillDescription(skillId) }}
+                                </p>
+                            </div>
+                        </article>
+                    </div>
+                </template>
+
+                <template v-else-if="tab === 'bag'">
+                    <h3>包裹</h3>
+                    <div class="grid two" style="margin-top: 0.85rem">
+                        <article class="card">
+                            <h3>丹药</h3>
+                            <div class="list" style="margin-top: 0.65rem">
+                                <div v-for="(count, id) in save.inventory" :key="id" class="card">
+                                    <div class="row">
+                                        <strong :class="'quality-' + item(id).quality">{{ itemName(id) }} ×{{ count }}</strong>
+                                        <button v-for="role in save.party" :key="role.id" @click="usePill(role.id, id)">给{{ role.name }}</button>
+                                    </div>
+                                    <p class="desc">{{ item(id).description }}</p>
+                                    <p class="muted">{{ itemEffect(id) }}</p>
+                                </div>
+                            </div>
+                        </article>
+                        <article class="card">
+                            <h3>背包装备</h3>
+                            <div class="list" style="margin-top: 0.65rem">
+                                <div v-for="(count, id) in save.equipmentBag" :key="id" class="card">
+                                    <strong :class="'quality-' + equipment(id).quality">{{ equipmentName(id) }} ×{{ count }}</strong>
+                                    <p class="desc">{{ equipment(id).description }}</p>
+                                    <p class="muted">{{ equipmentStats(id) }}</p>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </template>
+
+                <template v-else-if="tab === 'shop'">
+                    <h3>坊市</h3>
+                    <div class="grid two" style="margin-top: 0.85rem">
+                        <article class="card">
+                            <h3>丹药</h3>
+                            <div class="list" style="margin-top: 0.65rem">
+                                <div v-for="item in shop.items" :key="item.id" class="card">
+                                    <div class="row">
+                                        <strong :class="'quality-' + item.quality">{{ item.name }} · {{ item.quality }}</strong>
+                                        <span>{{ item.price }}灵石</span>
+                                        <button @click="buy(item.id)">购买</button>
+                                    </div>
+                                    <p class="desc">{{ item.description }}</p>
+                                    <p class="muted">{{ itemEffect(item.id) }}</p>
+                                </div>
+                            </div>
+                        </article>
+                        <article class="card">
+                            <h3>装备</h3>
+                            <div class="list" style="margin-top: 0.65rem">
+                                <div v-for="eq in shop.equipment" :key="eq.id" class="card">
+                                    <div class="row">
+                                        <strong :class="'quality-' + eq.quality">{{ eq.name }} · {{ eq.quality }}</strong>
+                                        <span>{{ eq.price }}灵石</span>
+                                        <button @click="buy(eq.id)">购买</button>
+                                    </div>
+                                    <p class="desc">{{ eq.description }}</p>
+                                    <p class="muted">{{ equipmentStats(eq.id) }}</p>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </template>
+
+                <template v-else-if="tab === 'equip'">
+                    <h3>装备管理</h3>
+                    <div class="grid two" style="margin-top: 0.85rem">
+                        <article class="card" v-for="role in save.party" :key="role.id">
+                            <h3>{{ role.name }}</h3>
+                            <div class="list" style="margin-top: 0.65rem">
+                                <div class="compact-card" v-for="slot in equipmentSlots" :key="slot.key">
+                                    <div class="row">
+                                        <strong>{{ slot.name }}</strong>
+                                        <span>{{ role.equipment?.[slot.key] ? equipmentName(role.equipment[slot.key]) : '未装备' }}</span>
+                                        <button v-if="role.equipment?.[slot.key]" @click="unequipRole(role.id, slot.key)">卸下</button>
+                                    </div>
+                                    <p v-if="role.equipment?.[slot.key]" class="muted">{{ equipmentStats(role.equipment[slot.key]) }}</p>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                    <h3 style="margin-top: 1.2rem">背包装备</h3>
+                    <div class="grid two" style="margin-top: 0.85rem">
+                        <article class="card" v-for="entry in ownedEquipment" :key="entry.id">
+                            <div class="row">
+                                <strong :class="'quality-' + equipment(entry.id).quality">{{ equipmentName(entry.id) }}</strong>
+                                <span>背包 ×{{ entry.count }}</span>
+                            </div>
+                            <p class="desc">{{ equipment(entry.id).description }}</p>
+                            <p class="muted">{{ slotName(equipment(entry.id).slot) }} · {{ equipmentStats(entry.id) }}</p>
+                            <button @click="openEquipDialog(entry.id)" :disabled="entry.count <= 0">选择装备角色</button>
+                        </article>
+                    </div>
+                    <p v-if="!ownedEquipment.length" class="muted">背包里暂时没有可穿戴装备。</p>
+                </template>
+
+                <template v-else-if="tab === 'realm'">
+                    <h3>渡劫突破</h3>
+                    <div class="grid" style="margin-top: 0.85rem">
+                        <article class="card" v-for="role in save.party" :key="role.id">
+                            <h3>{{ role.name }}</h3>
+                            <p>{{ role.realm }}{{ role.realmLevel }}级 · 等级 {{ role.level }}</p>
+                            <p class="muted">筑基条件：等级 5，突破丹 ×1。突破后全属性提升。</p>
+                            <button @click="breakthrough(role.id)">开始突破</button>
+                        </article>
+                    </div>
+                </template>
+
+                <template v-else-if="tab === 'companions'">
+                    <h3>道友</h3>
+                    <div class="grid" style="margin-top: 0.85rem">
+                        <article class="card" v-for="role in save.companions" :key="role.id">
+                            <h3>{{ role.unlocked ? role.name : '未结识道友' }}</h3>
+                            <p class="muted">{{ role.element }}属性 · {{ role.gender }} · 好感度 {{ role.affection }}</p>
+                            <p>{{ role.unlocked ? '已获得' : '地图探索有机会结识' }}</p>
+                        </article>
+                    </div>
+                </template>
+
+                <template v-else-if="tab === 'codex'">
+                    <h3>图鉴</h3>
+                    <p class="muted">当前收集 {{ save.codex.length }} 项。</p>
+                    <div class="tabs" style="margin: 0.85rem 0">
+                        <button v-for="group in codexGroups" :key="group.key" :class="{active: codexTab === group.key}" @click="codexTab = group.key">
+                            {{ group.name }} {{ group.entries.length }}
+                        </button>
+                    </div>
+                    <div class="grid two">
+                        <article class="card" v-for="entry in currentCodex.entries" :key="entry">
+                            <h3>{{ entry }}</h3>
+                            <p class="muted">{{ currentCodex.name }}</p>
+                            <p class="desc">{{ codexDescription(entry) }}</p>
+                        </article>
+                    </div>
+                    <p v-if="!currentCodex.entries.length" class="muted">这个分类暂时还没有收集内容。</p>
+                </template>
+
+                <template v-if="battleResult">
+                    <h3 style="margin-top: 1.2rem">{{ battleResult.title }}</h3>
+                    <p>{{ battleResult.victory ? '战斗胜利' : '战斗失败' }}</p>
+                    <div class="log">{{ battleResult.logs.join('\n') }}</div>
+                </template>
+            </section>
+
+            <aside class="panel nav">
+                <button @click="openInn">客栈</button>
+                <button @click="startAdventure" :disabled="!!battle && !battle.finished">地图探索</button>
+                <button @click="startTowerBattle" :disabled="!!battle && !battle.finished">锁妖塔</button>
+                <button disabled>五行洞 v0.2</button>
+                <button disabled>万魔窟 v0.3</button>
+                <button disabled>仙灵洞 v0.3</button>
+                <button disabled>古战场 v0.2</button>
+            </aside>
+        </div>
+
+        <div v-if="innDialog" class="modal-mask" @click.self="innDialog = false">
+            <section class="modal">
+                <h3>客栈</h3>
+                <p class="desc">掌柜备好静室与灵泉，可为当前出战角色恢复全部体力与灵力，并清除异常状态。</p>
+                <p>出战人数：{{ save.party.length }}</p>
+                <p>每人花费：100灵石</p>
+                <p><strong>总计花费：{{ innCost }}灵石</strong></p>
+                <p class="muted">当前灵石：{{ save.resources.spiritStones }}</p>
+                <div class="row" style="margin-top: 1rem">
+                    <button @click="inn" :disabled="save.resources.spiritStones < innCost">确认恢复</button>
+                    <button @click="innDialog = false">暂不恢复</button>
+                </div>
+            </section>
+        </div>
+
+        <div v-if="equipDialog" class="modal-mask" @click.self="closeEquipDialog">
+            <section class="modal">
+                <h3>选择装备角色</h3>
+                <p class="desc">{{ equipmentName(selectedEquipmentId) }} · {{ slotName(equipment(selectedEquipmentId).slot) }} · {{ equipmentStats(selectedEquipmentId) }}</p>
+                <div class="list">
+                    <button v-for="role in save.party" :key="role.id" @click="equipRole(role.id, selectedEquipmentId)">
+                        给 {{ role.name }} 装备
+                        <span v-if="role.equipment?.[equipment(selectedEquipmentId).slot]">
+                            ，替换 {{ equipmentName(role.equipment[equipment(selectedEquipmentId).slot]) }}
+                        </span>
+                    </button>
+                </div>
+                <button style="margin-top: 1rem" @click="closeEquipDialog">取消</button>
+            </section>
+        </div>
+    </main>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            screen: "menu",
+            tab: "home",
+            codexTab: "equipment",
+            message: "",
+            save: null,
+            saves: [],
+            catalog: { skills: {}, items: {}, equipment: {}, elements: ["金", "木", "水", "火", "土"] },
+            shop: { items: [], equipment: [] },
+            battleResult: null,
+            battle: null,
+            pendingAction: null,
+            battleActionMode: null,
+            innDialog: false,
+            equipDialog: false,
+            selectedEquipmentId: null,
+            createForm: { name: "", gender: "男", element: "金" }
+        };
+    },
+    computed: {
+        elements() {
+            return this.catalog.elements || ["金", "木", "水", "火", "土"];
+        },
+        innCost() {
+            return this.save ? this.save.party.length * 100 : 0;
+        },
+        codexGroups() {
+            const entries = this.save?.codex || [];
+            const by = predicate => entries.filter(predicate);
+            const equipmentNames = Object.values(this.catalog.equipment || {}).map(x => x.name);
+            const itemNames = Object.values(this.catalog.items || {}).map(x => x.name);
+            const skillNames = Object.values(this.catalog.skills || {}).map(x => x.name);
+            const companionNames = (this.save?.companions || []).map(x => x.name);
+            const monsterNames = ["黑风寨匪徒", "银月妖狼", "鬼灵门邪修", "赤炎虎王", "石巨人"];
+            const used = new Set();
+            const take = (key, name, list) => {
+                list.forEach(x => used.add(x));
+                return { key, name, entries: list };
+            };
+            const groups = [
+                take("equipment", "装备图鉴", by(x => equipmentNames.includes(x))),
+                take("items", "道具图鉴", by(x => itemNames.includes(x))),
+                take("skills", "功法图鉴", by(x => skillNames.includes(x))),
+                take("companions", "道友图鉴", by(x => companionNames.includes(x))),
+                take("monsters", "怪物图鉴", by(x => monsterNames.includes(x)))
+            ];
+            groups.push({ key: "progress", name: "进度统计", entries: entries.filter(x => !used.has(x)) });
+            return groups;
+        },
+        currentCodex() {
+            return this.codexGroups.find(x => x.key === this.codexTab) || this.codexGroups[0] || { name: "", entries: [] };
+        },
+        currentActor() {
+            if (!this.battle?.save?.party) return null;
+            return this.battle.save.party.find(role => role.id === this.battle.currentActorId) || null;
+        },
+        pendingTargets() {
+            if (!this.pendingAction || !this.battle) return [];
+            return this.pendingAction.targetType === "ally" ? this.battle.save.party : this.battle.enemies;
+        },
+        equipmentSlots() {
+            return [
+                { key: "weapon", name: "武器" },
+                { key: "focus", name: "法器" },
+                { key: "armor", name: "防具" },
+                { key: "boots", name: "足具" }
+            ];
+        },
+        ownedEquipment() {
+            return Object.entries(this.save?.equipmentBag || {})
+                .map(([id, count]) => ({ id, count }))
+                .filter(entry => this.catalog.equipment[entry.id])
+                .sort((a, b) => this.equipmentName(a.id).localeCompare(this.equipmentName(b.id), "zh-CN"));
+        }
+    },
+    async mounted() {
+        await this.loadCatalog();
+        await this.loadShop();
+        await this.loadSaves();
+    },
+    methods: {
+        async request(url, options = {}) {
+            const response = await fetch(url, {
+                headers: { "Content-Type": "application/json" },
+                ...options
+            });
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.message || "操作失败");
+            return data;
+        },
+        async loadCatalog() {
+            this.catalog = await this.request("/api/game/catalog");
+        },
+        async loadShop() {
+            this.shop = await this.request("/api/game/shop");
+        },
+        async loadSaves() {
+            this.saves = await this.request("/api/game/saves");
+        },
+        async createGame() {
+            try {
+                this.save = await this.request("/api/game/new", {
+                    method: "POST",
+                    body: JSON.stringify(this.createForm)
+                });
+                this.message = "";
+                this.battleResult = null;
+                this.battle = null;
+                this.screen = "story";
+                this.tab = "home";
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
+        enterGame() {
+            this.message = "你独自踏入太南山，所有操作都会自动保存。";
+            this.screen = "game";
+        },
+        async openLoad() {
+            await this.loadSaves();
+            this.screen = "load";
+        },
+        async selectSave(id) {
+            this.save = await this.request(`/api/game/${id}`);
+            this.message = "进度已读取。";
+            this.battle = null;
+            this.pendingAction = null;
+            this.screen = "game";
+            this.tab = "home";
+        },
+        openInn() {
+            this.innDialog = true;
+        },
+        async inn() {
+            this.innDialog = false;
+            await this.safeUpdate(`/api/game/${this.save.id}/inn`, `客栈调息完成，花费 ${this.innCost} 灵石。`);
+        },
+        async startAdventure() {
+            try {
+                this.battle = await this.request(`/api/game/${this.save.id}/adventure`, { method: "POST" });
+                this.save = this.battle.save;
+                this.pendingAction = null;
+                this.battleActionMode = null;
+                this.message = "遭遇敌人，进入战斗。";
+                this.battleResult = null;
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
+        async startTowerBattle() {
+            try {
+                this.battle = await this.request(`/api/game/${this.save.id}/battle/tower/start`, { method: "POST" });
+                this.save = this.battle.save;
+                this.pendingAction = null;
+                this.battleActionMode = null;
+                this.message = "踏入锁妖塔，进入战斗。";
+                this.battleResult = null;
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
+        async runBattle(url) {
+            try {
+                this.battleResult = await this.request(url, { method: "POST" });
+                this.save = this.battleResult.save;
+                this.message = this.battleResult.victory ? "胜利后已自动保存。" : "战斗结束，已自动保存。";
+                this.tab = "home";
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
+        async buy(itemId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/shop/buy`, "购买成功。", { itemId, quantity: 1 });
+        },
+        async usePill(characterId, itemId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/pill/use`, "丹药已使用。", { characterId, itemId });
+        },
+        async equipRole(characterId, equipmentId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/equip`, "装备已更换。", { characterId, equipmentId });
+            this.closeEquipDialog();
+        },
+        async unequipRole(characterId, slot) {
+            await this.safeUpdate(`/api/game/${this.save.id}/equip/unequip`, "装备已卸下。", { characterId, slot });
+        },
+        async breakthrough(characterId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/breakthrough`, "突破成功。", { characterId });
+        },
+        async safeUpdate(url, success, body = null) {
+            try {
+                this.save = await this.request(url, {
+                    method: "POST",
+                    body: body ? JSON.stringify(body) : undefined
+                });
+                this.message = success;
+                this.battleResult = null;
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
+        percent(value, max) {
+            return max ? Math.max(0, Math.min(100, Math.round(value * 100 / max))) : 0;
+        },
+        skillName(id) {
+            return this.catalog.skills[id]?.name || id;
+        },
+        item(id) {
+            return this.catalog.items[id] || {};
+        },
+        itemName(id) {
+            return this.item(id).name || id;
+        },
+        itemEffect(id) {
+            const item = this.item(id);
+            if (!item.name) return "";
+            const effects = [];
+            if (item.hpPercent) effects.push(`恢复体力 ${item.hpPercent}%`);
+            if (item.mpPercent) effects.push(`恢复灵力 ${item.mpPercent}%`);
+            if (item.category === "breakthrough") effects.push("用于境界突破");
+            return effects.join("，") || "特殊道具";
+        },
+        equipment(id) {
+            return this.catalog.equipment[id] || {};
+        },
+        equipmentName(id) {
+            return this.equipment(id).name || id;
+        },
+        equipmentStats(id) {
+            const eq = this.equipment(id);
+            const stats = [];
+            if (eq.attack) stats.push(`武力 +${eq.attack}`);
+            if (eq.magic) stats.push(`法力 +${eq.magic}`);
+            if (eq.defense) stats.push(`防御 +${eq.defense}`);
+            if (eq.agility) stats.push(`敏捷 +${eq.agility}`);
+            return stats.join("，") || "无属性加成";
+        },
+        equippedText(role) {
+            const values = Object.values(role.equipment || {});
+            return values.length ? values.map(this.equipmentName).join("、") : "无";
+        },
+        stat(role, key) {
+            let value = role[key] || 0;
+            Object.values(role.equipment || {}).forEach(id => {
+                const eq = this.equipment(id);
+                if (key === "attack") value += eq.attack || 0;
+                if (key === "magic") value += eq.magic || 0;
+                if (key === "defense") value += eq.defense || 0;
+                if (key === "agility") value += eq.agility || 0;
+            });
+            return value;
+        },
+        skill(id) {
+            return this.catalog.skills[id] || {};
+        },
+        skillDescription(id) {
+            const skill = this.skill(id);
+            if (!skill.name) return "";
+            if (skill.type === "heal") {
+                return `治疗技能，恢复${skill.power}%体力，消耗${skill.mpCost}灵力`;
+            }
+            const parts = [`${this.damageTypeName(skill.type)}伤害`, `威力${skill.power}%`];
+            if (skill.mpCost) parts.push(`消耗${skill.mpCost}灵力`);
+            if (skill.status) parts.push(`附加${skill.status}${skill.statusTurns}回合`);
+            return parts.join("，");
+        },
+        damageTypeName(type) {
+            if (type === "physical") return "物理";
+            if (type === "magical") return "法术";
+            return "特殊";
+        },
+        setPendingAttack() {
+            this.pendingAction = { action: "attack", targetType: "enemy" };
+            this.battleActionMode = null;
+        },
+        setPendingSkill(skillId) {
+            const skill = this.skill(skillId);
+            this.pendingAction = {
+                action: "skill",
+                skillId,
+                targetType: skill.type === "heal" ? "ally" : "enemy"
+            };
+            this.battleActionMode = null;
+        },
+        setPendingItem(itemId) {
+            this.pendingAction = { action: "item", itemId, targetType: "ally" };
+            this.battleActionMode = null;
+        },
+        async submitBattleTarget(targetId) {
+            if (!this.pendingAction) return;
+            await this.submitBattleAction({ ...this.pendingAction, targetId });
+        },
+        async submitBattleAction(action) {
+            try {
+                this.battle = await this.request(`/api/game/battle/${this.battle.id}/action`, {
+                    method: "POST",
+                    body: JSON.stringify(action)
+                });
+                this.save = this.battle.save;
+                this.pendingAction = null;
+                this.battleActionMode = null;
+                this.message = this.battle.finished ? "战斗结束，已自动保存。" : "轮到你行动。";
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
+        closeBattle() {
+            this.battle = null;
+            this.pendingAction = null;
+            this.battleActionMode = null;
+            this.battleResult = null;
+            this.tab = "home";
+        },
+        openEquipDialog(equipmentId) {
+            this.selectedEquipmentId = equipmentId;
+            this.equipDialog = true;
+        },
+        closeEquipDialog() {
+            this.equipDialog = false;
+            this.selectedEquipmentId = null;
+        },
+        slotName(slot) {
+            const found = this.equipmentSlots.find(item => item.key === slot);
+            return found ? found.name : slot;
+        },
+        statusText(role) {
+            const entries = Object.entries(role.statuses || {}).filter(([, turns]) => turns > 0);
+            return entries.length ? entries.map(([name, turns]) => `${name}${turns}`).join("、") : "无";
+        },
+        codexDescription(entry) {
+            const equipment = Object.values(this.catalog.equipment || {}).find(x => x.name === entry);
+            if (equipment) return equipment.description;
+            const item = Object.values(this.catalog.items || {}).find(x => x.name === entry);
+            if (item) return item.description;
+            const skill = Object.values(this.catalog.skills || {}).find(x => x.name === entry);
+            if (skill) return `${skill.element}属性功法，${this.damageTypeName(skill.type)}类型，威力${skill.power}%，消耗${skill.mpCost}灵力。`;
+            const companion = (this.save?.companions || []).find(x => x.name === entry);
+            if (companion) return `${companion.element}属性道友，已在旅途中与你结识。`;
+            if (["黑风寨匪徒", "银月妖狼", "鬼灵门邪修", "赤炎虎王", "石巨人"].includes(entry)) return "太南山与锁妖塔中记录过的敌人。";
+            return "修仙路上已经记录的关键进度。";
+        }
+    }
+}).mount("#app");
+</script>
+</body>
+</html>
