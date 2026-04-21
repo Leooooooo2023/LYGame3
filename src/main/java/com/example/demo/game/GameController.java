@@ -5,6 +5,7 @@ import com.example.demo.model.BattleActionRequest;
 import com.example.demo.model.BattleSession;
 import com.example.demo.model.CreateGameRequest;
 import com.example.demo.model.GameSave;
+import com.example.demo.model.PartyRequest;
 import com.example.demo.model.SimpleRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -54,6 +55,7 @@ public class GameController {
         data.put("skills", Catalog.SKILLS);
         data.put("items", Catalog.ITEMS);
         data.put("equipment", Catalog.EQUIPMENT);
+        data.put("treasures", Catalog.TREASURES);
         data.put("elements", Catalog.ELEMENTS);
         return data;
     }
@@ -83,6 +85,26 @@ public class GameController {
         return gameService.unequip(id, request.characterId, request.slot);
     }
 
+    @PostMapping("/{id}/treasure/equip")
+    public GameSave equipTreasure(@PathVariable String id, @RequestBody SimpleRequest request) {
+        return gameService.equipTreasure(id, request.characterId, request.treasureId);
+    }
+
+    @PostMapping("/{id}/treasure/unequip")
+    public GameSave unequipTreasure(@PathVariable String id, @RequestBody SimpleRequest request) {
+        return gameService.unequipTreasure(id, request.characterId);
+    }
+
+    @PostMapping("/{id}/manual/learn")
+    public GameSave learnManual(@PathVariable String id, @RequestBody SimpleRequest request) {
+        return gameService.learnManual(id, request.characterId, request.itemId);
+    }
+
+    @PostMapping("/{id}/party")
+    public GameSave updateParty(@PathVariable String id, @RequestBody PartyRequest request) {
+        return gameService.updateParty(id, request);
+    }
+
     @PostMapping("/{id}/breakthrough")
     public GameSave breakthrough(@PathVariable String id, @RequestBody SimpleRequest request) {
         return gameService.breakthrough(id, request.characterId);
@@ -101,6 +123,11 @@ public class GameController {
     @PostMapping("/{id}/battle/tower/start")
     public BattleSession startTowerBattle(@PathVariable String id) {
         return gameService.startTowerBattle(id);
+    }
+
+    @PostMapping("/{id}/trial/{element}")
+    public BattleSession startElementTrial(@PathVariable String id, @PathVariable String element) {
+        return gameService.startElementTrial(id, element);
     }
 
     @GetMapping("/battle/{battleId}")

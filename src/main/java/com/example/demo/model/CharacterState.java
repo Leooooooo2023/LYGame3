@@ -26,6 +26,7 @@ public class CharacterState {
     public int defense = 15;
     public int agility = 10;
     public int affection = 0;
+    public String treasure;
     public List<String> skills = new ArrayList<>();
     public Map<String, String> equipment = new HashMap<>();
     public Map<String, Integer> statuses = new HashMap<>();

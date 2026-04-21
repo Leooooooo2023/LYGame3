@@ -7,6 +7,8 @@ import com.example.demo.model.CharacterState;
 import com.example.demo.model.EquipmentDef;
 import com.example.demo.model.GameSave;
 import com.example.demo.model.ItemDef;
+import com.example.demo.model.MagicTreasureDef;
+import com.example.demo.model.PartyRequest;
 import com.example.demo.model.SkillDef;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
@@ -49,6 +51,7 @@ public class GameService {
         if (save == null) {
             throw new IllegalArgumentException("存档不存在");
         }
+        normalizeSave(save);
         return save;
     }
 
@@ -79,6 +82,7 @@ public class GameService {
 
         save.inventory.put("huanglong_pill", 5);
         save.inventory.put("heqi_pill", 5);
+        save.treasureBag.put("binding_charm", 1);
         save.party.get(0).equipment.put("weapon", "bamboo_sword");
         save.party.get(0).equipment.put("armor", "cloth_robe");
         addCodex(save, "主角");
@@ -89,6 +93,7 @@ public class GameService {
         addCodex(save, "合气丹");
         addCodex(save, "青竹剑");
         addCodex(save, "灰布道袍");
+        addCodex(save, "定身符");
 
         saves.put(save.id, save);
         persist(save);
@@ -99,6 +104,7 @@ public class GameService {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("items", Catalog.shopItems());
         data.put("equipment", Catalog.shopEquipment());
+        data.put("treasures", Catalog.shopTreasures());
         return data;
     }
 
@@ -107,11 +113,14 @@ public class GameService {
         int count = Math.max(quantity, 1);
         ItemDef item = Catalog.ITEMS.get(itemId);
         EquipmentDef equipment = Catalog.EQUIPMENT.get(itemId);
+        MagicTreasureDef treasure = Catalog.TREASURES.get(itemId);
         int price;
         if (item != null) {
             price = item.price * count;
         } else if (equipment != null) {
             price = equipment.price * count;
+        } else if (treasure != null) {
+            price = treasure.price * count;
         } else {
             throw new IllegalArgumentException("商品不存在");
         }
@@ -127,6 +136,12 @@ public class GameService {
             }
             addCodex(save, item.name);
         } else {
+            if (treasure != null) {
+                addCount(save.treasureBag, treasure.id, count);
+                addCodex(save, treasure.name);
+                persist(save);
+                return save;
+            }
             addCount(save.equipmentBag, equipment.id, count);
             addCodex(save, equipment.name);
         }
@@ -197,6 +212,93 @@ public class GameService {
             throw new IllegalArgumentException("该装备位没有装备");
         }
         addCount(save.equipmentBag, old, 1);
+        persist(save);
+        return save;
+    }
+
+    public GameSave equipTreasure(String saveId, String characterId, String treasureId) {
+        GameSave save = getSave(saveId);
+        MagicTreasureDef treasure = Catalog.TREASURES.get(treasureId);
+        if (treasure == null) {
+            throw new IllegalArgumentException("法宝不存在");
+        }
+        if (save.treasureBag.getOrDefault(treasureId, 0) <= 0) {
+            throw new IllegalArgumentException("背包中没有这件法宝");
+        }
+        CharacterState character = findCharacter(save, characterId);
+        String old = character.treasure;
+        character.treasure = treasureId;
+        addCount(save.treasureBag, treasureId, -1);
+        if (old != null && !old.isBlank()) {
+            addCount(save.treasureBag, old, 1);
+        }
+        persist(save);
+        return save;
+    }
+
+    public GameSave unequipTreasure(String saveId, String characterId) {
+        GameSave save = getSave(saveId);
+        CharacterState character = findCharacter(save, characterId);
+        if (character.treasure == null || character.treasure.isBlank()) {
+            throw new IllegalArgumentException("该角色没有装备法宝");
+        }
+        addCount(save.treasureBag, character.treasure, 1);
+        character.treasure = null;
+        persist(save);
+        return save;
+    }
+
+    public GameSave learnManual(String saveId, String characterId, String itemId) {
+        GameSave save = getSave(saveId);
+        ItemDef manual = Catalog.ITEMS.get(itemId);
+        if (manual == null || !"manual".equals(manual.category)) {
+            throw new IllegalArgumentException("秘籍不存在");
+        }
+        if (save.inventory.getOrDefault(itemId, 0) <= 0) {
+            throw new IllegalArgumentException("秘籍数量不足");
+        }
+        CharacterState character = findCharacter(save, characterId);
+        SkillDef skill = Catalog.SKILLS.get(manual.skillId);
+        if (skill == null) {
+            throw new IllegalArgumentException("秘籍对应技能不存在");
+        }
+        if (!character.element.equals(skill.element)) {
+            throw new IllegalArgumentException("五行属性不符，无法学习");
+        }
+        if (character.skills.contains(skill.id)) {
+            throw new IllegalArgumentException("角色已经掌握该技能");
+        }
+        character.skills.add(skill.id);
+        addCount(save.inventory, itemId, -1);
+        addCodex(save, skill.name);
+        persist(save);
+        return save;
+    }
+
+    public GameSave updateParty(String saveId, PartyRequest request) {
+        GameSave save = getSave(saveId);
+        CharacterState player = save.party.stream()
+                .filter(c -> !c.companion)
+                .findFirst()
+                .orElse(save.party.get(0));
+        List<CharacterState> newParty = new ArrayList<>();
+        newParty.add(player);
+        for (String companionId : request.companionIds) {
+            if (newParty.size() >= 3) {
+                break;
+            }
+            CharacterState companion = save.companions.stream()
+                    .filter(c -> c.id.equals(companionId))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("道友不存在"));
+            if (!companion.unlocked) {
+                throw new IllegalArgumentException("该道友尚未结识");
+            }
+            if (newParty.stream().noneMatch(c -> c.id.equals(companion.id))) {
+                newParty.add(companion);
+            }
+        }
+        save.party = newParty;
         persist(save);
         return save;
     }
@@ -273,6 +375,15 @@ public class GameService {
         return startBattle(save, "锁妖塔第 " + save.towerFloor + " 层", "tower", save.towerFloor, true);
     }
 
+    public BattleSession startElementTrial(String saveId, String element) {
+        if (!Catalog.ELEMENTS.contains(element)) {
+            throw new IllegalArgumentException("五行属性不存在");
+        }
+        GameSave save = getSave(saveId);
+        int difficulty = Math.max(1, Math.min(30, save.highestTowerFloor + 1));
+        return startBattle(save, element + "行试炼洞", "trial_" + element, difficulty, false);
+    }
+
     public BattleSession getBattle(String battleId) {
         BattleSession battle = battles.get(battleId);
         if (battle == null) {
@@ -344,6 +455,29 @@ public class GameService {
                 target.mp = Math.min(target.maxMp, target.mp + target.maxMp * item.mpPercent / 100);
                 addCount(save.inventory, request.itemId, -1);
                 battle.logs.add(actor.name + " 使用 " + item.name + "，为 " + target.name + " 恢复状态。");
+            }
+            case "treasure" -> {
+                if (actor.treasure == null || actor.treasure.isBlank()) {
+                    throw new IllegalArgumentException("当前角色没有装备法宝");
+                }
+                if (battle.usedTreasures.getOrDefault(actor.id, false)) {
+                    throw new IllegalArgumentException("该角色本场战斗已经使用过法宝");
+                }
+                MagicTreasureDef treasure = Catalog.TREASURES.get(actor.treasure);
+                if (treasure == null) {
+                    throw new IllegalArgumentException("法宝不存在");
+                }
+                if (actor.mp < treasure.mpCost) {
+                    throw new IllegalArgumentException("灵力不足，无法使用法宝");
+                }
+                CharacterState target = "ally".equals(treasure.targetType)
+                        ? findLivingById(save.party, request.targetId)
+                        : findLivingById(battle.enemies, request.targetId);
+                if (target == null) {
+                    throw new IllegalArgumentException("请选择可用目标");
+                }
+                performTreasure(actor, target, treasure, battle.logs);
+                battle.usedTreasures.put(actor.id, true);
             }
             case "escape" -> {
                 battle.finished = true;
@@ -514,7 +648,18 @@ public class GameService {
         }
         if (battle.tower) {
             save.highestTowerFloor = Math.max(save.highestTowerFloor, save.towerFloor);
-            save.towerFloor = Math.min(10, save.towerFloor + 1);
+            save.towerFloor = Math.min(30, save.towerFloor + 1);
+        }
+        if (battle.type != null && battle.type.startsWith("trial_")) {
+            String element = battle.type.substring("trial_".length());
+            save.resources.fiveElementEssence += 2;
+            battle.essence += 2;
+            ItemDef manual = trialManual(element);
+            if (manual != null && random.nextInt(100) < 50) {
+                addCount(save.inventory, manual.id, 1);
+                addCodex(save, manual.name);
+                battle.drops.add(manual.name + " ×1");
+            }
         }
         battle.logs.add("战斗胜利，获得灵石 " + battle.spiritStones + "、五行精华 " + battle.essence + "、经验 " + battle.exp + "。");
     }
@@ -570,6 +715,38 @@ public class GameService {
             target.statuses.put(skill.status, skill.statusTurns);
             logs.add(target.name + " 陷入" + skill.status + "状态。");
         }
+    }
+
+    private void performTreasure(CharacterState actor, CharacterState target, MagicTreasureDef treasure, List<String> logs) {
+        actor.mp -= treasure.mpCost;
+        switch (treasure.effectType) {
+            case "stun" -> {
+                target.statuses.put("眩晕", Math.max(1, treasure.power));
+                logs.add(actor.name + " 祭出 " + treasure.name + "，使 " + target.name + " 眩晕" + Math.max(1, treasure.power) + "回合。");
+            }
+            case "heal" -> {
+                int amount = target.maxHp * treasure.power / 100;
+                target.hp = Math.min(target.maxHp, target.hp + amount);
+                logs.add(actor.name + " 使用 " + treasure.name + "，为 " + target.name + " 恢复 " + amount + " 体力。");
+            }
+            case "mp" -> {
+                int amount = target.maxMp * treasure.power / 100;
+                target.mp = Math.min(target.maxMp, target.mp + amount);
+                logs.add(actor.name + " 使用 " + treasure.name + "，为 " + target.name + " 恢复 " + amount + " 灵力。");
+            }
+            default -> logs.add(actor.name + " 使用 " + treasure.name + "，但法宝没有生效。");
+        }
+    }
+
+    private ItemDef trialManual(String element) {
+        return Catalog.ITEMS.values().stream()
+                .filter(item -> "manual".equals(item.category))
+                .filter(item -> {
+                    SkillDef skill = Catalog.SKILLS.get(item.skillId);
+                    return skill != null && element.equals(skill.element);
+                })
+                .findFirst()
+                .orElse(null);
     }
 
     private CharacterState findAnyActor(GameSave save, BattleSession battle, String actorId) {
@@ -653,7 +830,7 @@ public class GameService {
             }
             if (tower) {
                 save.highestTowerFloor = Math.max(save.highestTowerFloor, save.towerFloor);
-                save.towerFloor = Math.min(10, save.towerFloor + 1);
+                save.towerFloor = Math.min(30, save.towerFloor + 1);
             }
             result.logs.add("战斗胜利，获得灵石 " + result.spiritStones + "、经验 " + result.exp + "。");
         } else {
@@ -812,19 +989,19 @@ public class GameService {
     }
 
     private int totalAttack(CharacterState character) {
-        return character.attack + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.attack).sum();
+        return character.attack + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.attack).sum();
     }
 
     private int totalMagic(CharacterState character) {
-        return character.magic + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.magic).sum();
+        return character.magic + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.magic).sum();
     }
 
     private int totalDefense(CharacterState character) {
-        return character.defense + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.defense).sum();
+        return character.defense + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.defense).sum();
     }
 
     private int totalAgility(CharacterState character) {
-        int value = character.agility + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.agility).sum();
+        int value = character.agility + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.agility).sum();
         if (character.statuses.getOrDefault("减速", 0) > 0) {
             value /= 2;
         }
@@ -837,6 +1014,40 @@ public class GameService {
                 || ("土".equals(attacker) && "水".equals(defender))
                 || ("水".equals(attacker) && "火".equals(defender))
                 || ("火".equals(attacker) && "金".equals(defender));
+    }
+
+    private int affectionBonus(CharacterState character) {
+        return character.companion ? character.affection / 5 : 0;
+    }
+
+    private void normalizeSave(GameSave save) {
+        if (save.treasureBag == null) {
+            save.treasureBag = new LinkedHashMap<>();
+        }
+        if (save.inventory == null) {
+            save.inventory = new LinkedHashMap<>();
+        }
+        if (save.equipmentBag == null) {
+            save.equipmentBag = new LinkedHashMap<>();
+        }
+        for (CharacterState character : save.party) {
+            normalizeCharacter(character);
+        }
+        for (CharacterState character : save.companions) {
+            normalizeCharacter(character);
+        }
+    }
+
+    private void normalizeCharacter(CharacterState character) {
+        if (character.skills == null) {
+            character.skills = new ArrayList<>();
+        }
+        if (character.equipment == null) {
+            character.equipment = new java.util.HashMap<>();
+        }
+        if (character.statuses == null) {
+            character.statuses = new java.util.HashMap<>();
+        }
     }
 
     private boolean alive(CharacterState character) {

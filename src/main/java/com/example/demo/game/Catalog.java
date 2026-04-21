@@ -2,6 +2,7 @@ package com.example.demo.game;
 
 import com.example.demo.model.EquipmentDef;
 import com.example.demo.model.ItemDef;
+import com.example.demo.model.MagicTreasureDef;
 import com.example.demo.model.SkillDef;
 
 import java.util.Collection;
@@ -13,6 +14,7 @@ public final class Catalog {
     public static final Map<String, SkillDef> SKILLS = new LinkedHashMap<>();
     public static final Map<String, EquipmentDef> EQUIPMENT = new LinkedHashMap<>();
     public static final Map<String, ItemDef> ITEMS = new LinkedHashMap<>();
+    public static final Map<String, MagicTreasureDef> TREASURES = new LinkedHashMap<>();
     public static final List<String> ELEMENTS = List.of("金", "木", "水", "火", "土");
 
     static {
@@ -54,6 +56,15 @@ public final class Catalog {
         addItem("heqi_pill", "合气丹", "pill", "凡品", "调和气海的小丹，使用后恢复30%灵力。", 40, 0, 30);
         addItem("huiyuan_pill", "回元丹", "pill", "良品", "药力温和稳定，使用后同时恢复30%体力与灵力。", 120, 30, 30);
         addItem("breakthrough_pill", "突破丹", "breakthrough", "良品", "冲击筑基期所需丹药，当前版本突破消耗1枚。", 300, 0, 0);
+        addManual("manual_metal_poison", "金毒针秘籍", "良品", "记载金毒针的秘籍，可让金属性角色学习中毒法术。", 360, "metal_poison");
+        addManual("manual_wood_poison", "腐毒术秘籍", "良品", "记载腐毒术的秘籍，可让木属性角色学习中毒法术。", 360, "wood_poison");
+        addManual("manual_water_slow", "寒毒咒秘籍", "良品", "记载寒毒咒的秘籍，可让水属性角色学习减速法术。", 360, "water_slow");
+        addManual("manual_fire_burn", "炎毒术秘籍", "良品", "记载炎毒术的秘籍，可让火属性角色学习灼烧法术。", 360, "fire_burn");
+        addManual("manual_earth_poison", "土毒咒秘籍", "良品", "记载土毒咒的秘籍，可让土属性角色学习中毒法术。", 360, "earth_poison");
+
+        addTreasure("binding_charm", "定身符", "凡品", "stun", "enemy", "战斗中使一名敌人眩晕1回合，每场每名角色只能使用一次法宝。", 30, 1, 260);
+        addTreasure("spring_charm", "回春符", "良品", "heal", "ally", "战斗中恢复一名队友50%最大体力。", 40, 50, 420);
+        addTreasure("spirit_charm", "聚灵符", "良品", "mp", "ally", "战斗中恢复一名队友50%最大灵力。", 40, 50, 420);
     }
 
     private Catalog() {
@@ -65,6 +76,10 @@ public final class Catalog {
 
     public static Collection<ItemDef> shopItems() {
         return ITEMS.values();
+    }
+
+    public static Collection<MagicTreasureDef> shopTreasures() {
+        return TREASURES.values();
     }
 
     public static List<String> initialSkills(String element) {
@@ -88,5 +103,13 @@ public final class Catalog {
 
     private static void addItem(String id, String name, String category, String quality, String description, int price, int hpPercent, int mpPercent) {
         ITEMS.put(id, new ItemDef(id, name, category, quality, description, price, hpPercent, mpPercent));
+    }
+
+    private static void addManual(String id, String name, String quality, String description, int price, String skillId) {
+        ITEMS.put(id, new ItemDef(id, name, "manual", quality, description, price, 0, 0, skillId));
+    }
+
+    private static void addTreasure(String id, String name, String quality, String effectType, String targetType, String description, int mpCost, int power, int price) {
+        TREASURES.put(id, new MagicTreasureDef(id, name, quality, effectType, targetType, description, mpCost, power, price));
     }
 }

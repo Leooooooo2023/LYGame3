@@ -17,5 +17,6 @@ public class GameSave {
     public List<CharacterState> companions = new ArrayList<>();
     public Map<String, Integer> inventory = new LinkedHashMap<>();
     public Map<String, Integer> equipmentBag = new LinkedHashMap<>();
+    public Map<String, Integer> treasureBag = new LinkedHashMap<>();
     public List<String> codex = new ArrayList<>();
 }

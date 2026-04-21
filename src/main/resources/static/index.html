@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>凡人修仙外传 v0.1</title>
+    <title>凡人修仙外传 v0.2</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -183,7 +183,7 @@
     <main v-if="screen === 'menu'" class="menu">
         <section class="title-block">
             <h1>凡人修仙外传</h1>
-            <p class="subtitle">v0.1 网页端单机修仙回合制</p>
+            <p class="subtitle">v0.2 网页端单机修仙回合制</p>
             <div class="stack">
                 <button @click="screen = 'create'">新的旅程</button>
                 <button @click="openLoad">读取进度</button>
@@ -247,9 +247,9 @@
     <main v-else-if="screen === 'about'" class="menu">
         <section class="title-block">
             <h2>关于游戏</h2>
-            <p class="subtitle">开发者：李涌 · 版本：v0.1 · 发布目标：可玩的修仙成长闭环</p>
+            <p class="subtitle">开发者：李涌 · 版本：v0.2 · 发布目标：修仙战斗与道友养成扩展</p>
             <div class="stack">
-                <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、境界突破、装备丹药收集。</p>
+                <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、秘籍学习、法宝使用、五行试炼、境界突破。</p>
                 <button @click="screen = 'menu'">返回</button>
             </div>
         </section>
@@ -276,6 +276,7 @@
                 <button :class="{active: tab === 'bag'}" @click="tab = 'bag'">包裹</button>
                 <button :class="{active: tab === 'shop'}" @click="tab = 'shop'">坊市</button>
                 <button :class="{active: tab === 'equip'}" @click="tab = 'equip'">装备</button>
+                <button :class="{active: tab === 'treasure'}" @click="tab = 'treasure'">法宝</button>
                 <button :class="{active: tab === 'realm'}" @click="tab = 'realm'">渡劫</button>
                 <button :class="{active: tab === 'companions'}" @click="tab = 'companions'">道友</button>
                 <button :class="{active: tab === 'codex'}" @click="tab = 'codex'">图鉴</button>
@@ -327,6 +328,7 @@
                                 <button @click="setPendingAttack">普通攻击</button>
                                 <button @click="battleActionMode = battleActionMode === 'skills' ? null : 'skills'">技能</button>
                                 <button @click="battleActionMode = battleActionMode === 'items' ? null : 'items'">丹药</button>
+                                <button @click="setPendingTreasure" :disabled="!currentActor?.treasure || battle.usedTreasures?.[currentActor.id]">法宝</button>
                                 <button @click="submitBattleAction({action: 'escape'})">逃跑</button>
                             </div>
 
@@ -346,6 +348,7 @@
 
                             <div v-if="pendingAction" style="margin-top: 1rem">
                                 <h3>选择目标</h3>
+                                <p v-if="pendingAction.action === 'treasure'" class="muted">{{ treasureName(currentActor.treasure) }}：{{ treasure(currentActor.treasure).description }}</p>
                                 <div class="grid two" style="margin-top: 0.65rem">
                                     <button class="target-button" v-for="target in pendingTargets" :key="target.id" @click="submitBattleTarget(target.id)" :disabled="target.hp <= 0">
                                         {{ target.name }} · 体力 {{ target.hp }}/{{ target.maxHp }} · 灵力 {{ target.mp }}/{{ target.maxMp }}
@@ -405,7 +408,10 @@
                                 <div v-for="(count, id) in save.inventory" :key="id" class="card">
                                     <div class="row">
                                         <strong :class="'quality-' + item(id).quality">{{ itemName(id) }} ×{{ count }}</strong>
-                                        <button v-for="role in save.party" :key="role.id" @click="usePill(role.id, id)">给{{ role.name }}</button>
+                                        <template v-if="item(id).category === 'pill'">
+                                            <button v-for="role in save.party" :key="role.id" @click="usePill(role.id, id)">给{{ role.name }}</button>
+                                        </template>
+                                        <button v-if="item(id).category === 'manual'" @click="openManualDialog(id)">学习</button>
                                     </div>
                                     <p class="desc">{{ item(id).description }}</p>
                                     <p class="muted">{{ itemEffect(id) }}</p>
@@ -419,6 +425,16 @@
                                     <strong :class="'quality-' + equipment(id).quality">{{ equipmentName(id) }} ×{{ count }}</strong>
                                     <p class="desc">{{ equipment(id).description }}</p>
                                     <p class="muted">{{ equipmentStats(id) }}</p>
+                                </div>
+                            </div>
+                        </article>
+                        <article class="card">
+                            <h3>背包法宝</h3>
+                            <div class="list" style="margin-top: 0.65rem">
+                                <div v-for="(count, id) in save.treasureBag" :key="id" class="card">
+                                    <strong :class="'quality-' + treasure(id).quality">{{ treasureName(id) }} ×{{ count }}</strong>
+                                    <p class="desc">{{ treasure(id).description }}</p>
+                                    <p class="muted">{{ treasureEffect(id) }}</p>
                                 </div>
                             </div>
                         </article>
@@ -453,6 +469,20 @@
                                     </div>
                                     <p class="desc">{{ eq.description }}</p>
                                     <p class="muted">{{ equipmentStats(eq.id) }}</p>
+                                </div>
+                            </div>
+                        </article>
+                        <article class="card">
+                            <h3>法宝</h3>
+                            <div class="list" style="margin-top: 0.65rem">
+                                <div v-for="tr in shop.treasures" :key="tr.id" class="card">
+                                    <div class="row">
+                                        <strong :class="'quality-' + tr.quality">{{ tr.name }} · {{ tr.quality }}</strong>
+                                        <span>{{ tr.price }}灵石</span>
+                                        <button @click="buy(tr.id)">购买</button>
+                                    </div>
+                                    <p class="desc">{{ tr.description }}</p>
+                                    <p class="muted">{{ treasureEffect(tr.id) }}</p>
                                 </div>
                             </div>
                         </article>
@@ -491,6 +521,33 @@
                     <p v-if="!ownedEquipment.length" class="muted">背包里暂时没有可穿戴装备。</p>
                 </template>
 
+                <template v-else-if="tab === 'treasure'">
+                    <h3>法宝管理</h3>
+                    <div class="grid two" style="margin-top: 0.85rem">
+                        <article class="card" v-for="role in save.party" :key="role.id">
+                            <h3>{{ role.name }}</h3>
+                            <p class="muted">当前法宝：{{ role.treasure ? treasureName(role.treasure) : '未装备' }}</p>
+                            <p v-if="role.treasure" class="desc">{{ treasure(role.treasure).description }}</p>
+                            <div class="row">
+                                <button v-if="role.treasure" @click="unequipTreasure(role.id)">卸下法宝</button>
+                            </div>
+                        </article>
+                    </div>
+                    <h3 style="margin-top: 1.2rem">背包法宝</h3>
+                    <div class="grid two" style="margin-top: 0.85rem">
+                        <article class="card" v-for="entry in ownedTreasures" :key="entry.id">
+                            <div class="row">
+                                <strong :class="'quality-' + treasure(entry.id).quality">{{ treasureName(entry.id) }}</strong>
+                                <span>背包 ×{{ entry.count }}</span>
+                            </div>
+                            <p class="desc">{{ treasure(entry.id).description }}</p>
+                            <p class="muted">{{ treasureEffect(entry.id) }}</p>
+                            <button @click="openTreasureDialog(entry.id)" :disabled="entry.count <= 0">选择装备角色</button>
+                        </article>
+                    </div>
+                    <p v-if="!ownedTreasures.length" class="muted">背包里暂时没有法宝。</p>
+                </template>
+
                 <template v-else-if="tab === 'realm'">
                     <h3>渡劫突破</h3>
                     <div class="grid" style="margin-top: 0.85rem">
@@ -505,12 +562,20 @@
 
                 <template v-else-if="tab === 'companions'">
                     <h3>道友</h3>
+                    <p class="muted">选择最多 2 名已结识道友出战。道友每 5 点好感度为自身全属性 +1。</p>
                     <div class="grid" style="margin-top: 0.85rem">
                         <article class="card" v-for="role in save.companions" :key="role.id">
                             <h3>{{ role.unlocked ? role.name : '未结识道友' }}</h3>
-                            <p class="muted">{{ role.element }}属性 · {{ role.gender }} · 好感度 {{ role.affection }}</p>
+                            <p class="muted">{{ role.element }}属性 · {{ role.gender }} · 好感度 {{ role.affection }} · 加成 +{{ Math.floor(role.affection / 5) }}</p>
                             <p>{{ role.unlocked ? '已获得' : '地图探索有机会结识' }}</p>
+                            <button v-if="role.unlocked" @click="toggleCompanion(role.id)">
+                                {{ selectedCompanions.includes(role.id) ? '取消出战' : '加入出战' }}
+                            </button>
                         </article>
+                    </div>
+                    <div class="row" style="margin-top: 1rem">
+                        <button @click="saveParty">保存阵容</button>
+                        <span class="muted">当前选择 {{ selectedCompanions.length }}/2</span>
                     </div>
                 </template>
 
@@ -543,7 +608,7 @@
                 <button @click="openInn">客栈</button>
                 <button @click="startAdventure" :disabled="!!battle && !battle.finished">地图探索</button>
                 <button @click="startTowerBattle" :disabled="!!battle && !battle.finished">锁妖塔</button>
-                <button disabled>五行洞 v0.2</button>
+                <button @click="trialDialog = true" :disabled="!!battle && !battle.finished">五行洞</button>
                 <button disabled>万魔窟 v0.3</button>
                 <button disabled>仙灵洞 v0.3</button>
                 <button disabled>古战场 v0.2</button>
@@ -580,6 +645,44 @@
                 <button style="margin-top: 1rem" @click="closeEquipDialog">取消</button>
             </section>
         </div>
+
+        <div v-if="treasureDialog" class="modal-mask" @click.self="closeTreasureDialog">
+            <section class="modal">
+                <h3>选择法宝角色</h3>
+                <p class="desc">{{ treasureName(selectedTreasureId) }} · {{ treasureEffect(selectedTreasureId) }}</p>
+                <div class="list">
+                    <button v-for="role in save.party" :key="role.id" @click="equipTreasure(role.id, selectedTreasureId)">
+                        给 {{ role.name }} 装备
+                        <span v-if="role.treasure">，替换 {{ treasureName(role.treasure) }}</span>
+                    </button>
+                </div>
+                <button style="margin-top: 1rem" @click="closeTreasureDialog">取消</button>
+            </section>
+        </div>
+
+        <div v-if="manualDialog" class="modal-mask" @click.self="closeManualDialog">
+            <section class="modal">
+                <h3>学习秘籍</h3>
+                <p class="desc">{{ itemName(selectedManualId) }} · {{ item(selectedManualId).description }}</p>
+                <div class="list">
+                    <button v-for="role in save.party" :key="role.id" @click="learnManual(role.id, selectedManualId)">
+                        {{ role.name }} 学习
+                    </button>
+                </div>
+                <button style="margin-top: 1rem" @click="closeManualDialog">取消</button>
+            </section>
+        </div>
+
+        <div v-if="trialDialog" class="modal-mask" @click.self="trialDialog = false">
+            <section class="modal">
+                <h3>五行试炼洞</h3>
+                <p class="desc">选择一种五行试炼。胜利后额外获得五行精华，并有机会掉落对应属性秘籍。</p>
+                <div class="grid two" style="margin-top: 1rem">
+                    <button v-for="element in elements" :key="element" @click="startTrial(element)">{{ element }}行洞</button>
+                </div>
+                <button style="margin-top: 1rem" @click="trialDialog = false">返回</button>
+            </section>
+        </div>
     </main>
 </div>
 
@@ -595,8 +698,8 @@ createApp({
             message: "",
             save: null,
             saves: [],
-            catalog: { skills: {}, items: {}, equipment: {}, elements: ["金", "木", "水", "火", "土"] },
-            shop: { items: [], equipment: [] },
+            catalog: { skills: {}, items: {}, equipment: {}, treasures: {}, elements: ["金", "木", "水", "火", "土"] },
+            shop: { items: [], equipment: [], treasures: [] },
             battleResult: null,
             battle: null,
             pendingAction: null,
@@ -604,6 +707,12 @@ createApp({
             innDialog: false,
             equipDialog: false,
             selectedEquipmentId: null,
+            treasureDialog: false,
+            selectedTreasureId: null,
+            manualDialog: false,
+            selectedManualId: null,
+            trialDialog: false,
+            selectedCompanions: [],
             createForm: { name: "", gender: "男", element: "金" }
         };
     },
@@ -619,6 +728,7 @@ createApp({
             const by = predicate => entries.filter(predicate);
             const equipmentNames = Object.values(this.catalog.equipment || {}).map(x => x.name);
             const itemNames = Object.values(this.catalog.items || {}).map(x => x.name);
+            const treasureNames = Object.values(this.catalog.treasures || {}).map(x => x.name);
             const skillNames = Object.values(this.catalog.skills || {}).map(x => x.name);
             const companionNames = (this.save?.companions || []).map(x => x.name);
             const monsterNames = ["黑风寨匪徒", "银月妖狼", "鬼灵门邪修", "赤炎虎王", "石巨人"];
@@ -629,6 +739,7 @@ createApp({
             };
             const groups = [
                 take("equipment", "装备图鉴", by(x => equipmentNames.includes(x))),
+                take("treasures", "法宝图鉴", by(x => treasureNames.includes(x))),
                 take("items", "道具图鉴", by(x => itemNames.includes(x))),
                 take("skills", "功法图鉴", by(x => skillNames.includes(x))),
                 take("companions", "道友图鉴", by(x => companionNames.includes(x))),
@@ -661,6 +772,12 @@ createApp({
                 .map(([id, count]) => ({ id, count }))
                 .filter(entry => this.catalog.equipment[entry.id])
                 .sort((a, b) => this.equipmentName(a.id).localeCompare(this.equipmentName(b.id), "zh-CN"));
+        },
+        ownedTreasures() {
+            return Object.entries(this.save?.treasureBag || {})
+                .map(([id, count]) => ({ id, count }))
+                .filter(entry => this.catalog.treasures[entry.id])
+                .sort((a, b) => this.treasureName(a.id).localeCompare(this.treasureName(b.id), "zh-CN"));
         }
     },
     async mounted() {
@@ -698,6 +815,7 @@ createApp({
                 this.battle = null;
                 this.screen = "story";
                 this.tab = "home";
+                this.syncPartySelection();
                 await this.loadSaves();
             } catch (error) {
                 this.message = error.message;
@@ -718,6 +836,7 @@ createApp({
             this.pendingAction = null;
             this.screen = "game";
             this.tab = "home";
+            this.syncPartySelection();
         },
         openInn() {
             this.innDialog = true;
@@ -752,6 +871,20 @@ createApp({
                 this.message = error.message;
             }
         },
+        async startTrial(element) {
+            try {
+                this.trialDialog = false;
+                this.battle = await this.request(`/api/game/${this.save.id}/trial/${element}`, { method: "POST" });
+                this.save = this.battle.save;
+                this.pendingAction = null;
+                this.battleActionMode = null;
+                this.message = `进入${element}行试炼洞。`;
+                this.battleResult = null;
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
         async runBattle(url) {
             try {
                 this.battleResult = await this.request(url, { method: "POST" });
@@ -776,6 +909,32 @@ createApp({
         async unequipRole(characterId, slot) {
             await this.safeUpdate(`/api/game/${this.save.id}/equip/unequip`, "装备已卸下。", { characterId, slot });
         },
+        async equipTreasure(characterId, treasureId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/treasure/equip`, "法宝已装备。", { characterId, treasureId });
+            this.closeTreasureDialog();
+        },
+        async unequipTreasure(characterId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/treasure/unequip`, "法宝已卸下。", { characterId });
+        },
+        async learnManual(characterId, itemId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/manual/learn`, "秘籍学习成功。", { characterId, itemId });
+            this.closeManualDialog();
+        },
+        async saveParty() {
+            await this.safeUpdate(`/api/game/${this.save.id}/party`, "出战阵容已保存。", { companionIds: this.selectedCompanions });
+            this.syncPartySelection();
+        },
+        toggleCompanion(companionId) {
+            if (this.selectedCompanions.includes(companionId)) {
+                this.selectedCompanions = this.selectedCompanions.filter(id => id !== companionId);
+                return;
+            }
+            if (this.selectedCompanions.length >= 2) {
+                this.message = "最多选择 2 名道友出战。";
+                return;
+            }
+            this.selectedCompanions.push(companionId);
+        },
         async breakthrough(characterId) {
             await this.safeUpdate(`/api/game/${this.save.id}/breakthrough`, "突破成功。", { characterId });
         },
@@ -787,6 +946,7 @@ createApp({
                 });
                 this.message = success;
                 this.battleResult = null;
+                this.syncPartySelection();
                 await this.loadSaves();
             } catch (error) {
                 this.message = error.message;
@@ -811,6 +971,7 @@ createApp({
             if (item.hpPercent) effects.push(`恢复体力 ${item.hpPercent}%`);
             if (item.mpPercent) effects.push(`恢复灵力 ${item.mpPercent}%`);
             if (item.category === "breakthrough") effects.push("用于境界突破");
+            if (item.category === "manual") effects.push(`学习技能：${this.skillName(item.skillId)}`);
             return effects.join("，") || "特殊道具";
         },
         equipment(id) {
@@ -846,6 +1007,18 @@ createApp({
         skill(id) {
             return this.catalog.skills[id] || {};
         },
+        treasure(id) {
+            return this.catalog.treasures[id] || {};
+        },
+        treasureName(id) {
+            return this.treasure(id).name || id || "无";
+        },
+        treasureEffect(id) {
+            const treasure = this.treasure(id);
+            if (!treasure.name) return "";
+            const target = treasure.targetType === "ally" ? "我方" : "敌方";
+            return `${target}目标 · 消耗${treasure.mpCost}灵力 · 每场每名角色1次`;
+        },
         skillDescription(id) {
             const skill = this.skill(id);
             if (!skill.name) return "";
@@ -877,6 +1050,15 @@ createApp({
         },
         setPendingItem(itemId) {
             this.pendingAction = { action: "item", itemId, targetType: "ally" };
+            this.battleActionMode = null;
+        },
+        setPendingTreasure() {
+            const treasure = this.treasure(this.currentActor?.treasure);
+            this.pendingAction = {
+                action: "treasure",
+                treasureId: this.currentActor?.treasure,
+                targetType: treasure.targetType === "ally" ? "ally" : "enemy"
+            };
             this.battleActionMode = null;
         },
         async submitBattleTarget(targetId) {
@@ -913,6 +1095,22 @@ createApp({
             this.equipDialog = false;
             this.selectedEquipmentId = null;
         },
+        openTreasureDialog(treasureId) {
+            this.selectedTreasureId = treasureId;
+            this.treasureDialog = true;
+        },
+        closeTreasureDialog() {
+            this.treasureDialog = false;
+            this.selectedTreasureId = null;
+        },
+        openManualDialog(itemId) {
+            this.selectedManualId = itemId;
+            this.manualDialog = true;
+        },
+        closeManualDialog() {
+            this.manualDialog = false;
+            this.selectedManualId = null;
+        },
         slotName(slot) {
             const found = this.equipmentSlots.find(item => item.key === slot);
             return found ? found.name : slot;
@@ -921,11 +1119,18 @@ createApp({
             const entries = Object.entries(role.statuses || {}).filter(([, turns]) => turns > 0);
             return entries.length ? entries.map(([name, turns]) => `${name}${turns}`).join("、") : "无";
         },
+        syncPartySelection() {
+            this.selectedCompanions = (this.save?.party || [])
+                .filter(role => role.companion)
+                .map(role => role.id);
+        },
         codexDescription(entry) {
             const equipment = Object.values(this.catalog.equipment || {}).find(x => x.name === entry);
             if (equipment) return equipment.description;
             const item = Object.values(this.catalog.items || {}).find(x => x.name === entry);
             if (item) return item.description;
+            const treasure = Object.values(this.catalog.treasures || {}).find(x => x.name === entry);
+            if (treasure) return treasure.description;
             const skill = Object.values(this.catalog.skills || {}).find(x => x.name === entry);
             if (skill) return `${skill.element}属性功法，${this.damageTypeName(skill.type)}类型，威力${skill.power}%，消耗${skill.mpCost}灵力。`;
             const companion = (this.save?.companions || []).find(x => x.name === entry);

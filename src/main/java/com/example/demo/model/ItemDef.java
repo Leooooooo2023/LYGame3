@@ -9,11 +9,16 @@ public class ItemDef {
     public int price;
     public int hpPercent;
     public int mpPercent;
+    public String skillId;
 
     public ItemDef() {
     }
 
     public ItemDef(String id, String name, String category, String quality, String description, int price, int hpPercent, int mpPercent) {
+        this(id, name, category, quality, description, price, hpPercent, mpPercent, "");
+    }
+
+    public ItemDef(String id, String name, String category, String quality, String description, int price, int hpPercent, int mpPercent, String skillId) {
         this.id = id;
         this.name = name;
         this.category = category;
@@ -22,5 +27,6 @@ public class ItemDef {
         this.price = price;
         this.hpPercent = hpPercent;
         this.mpPercent = mpPercent;
+        this.skillId = skillId;
     }
 }

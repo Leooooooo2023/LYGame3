@@ -4,5 +4,6 @@ public class BattleActionRequest {
     public String action;
     public String skillId;
     public String itemId;
+    public String treasureId;
     public String targetId;
 }
