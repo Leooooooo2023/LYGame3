@@ -18,44 +18,59 @@ public final class Catalog {
     public static final List<String> ELEMENTS = List.of("金", "木", "水", "火", "土");
 
     static {
-        addSkill("metal_sword", "青元剑诀", "金", "physical", 100, 0, "", 0);
-        addSkill("metal_slash", "金光斩", "金", "magical", 150, 20, "", 0);
-        addSkill("metal_finger", "裂金指", "金", "physical", 120, 0, "", 0);
-        addSkill("metal_poison", "金毒针", "金", "magical", 100, 30, "中毒", 3);
+        addSkill("metal_sword", "青元剑诀", "金", "magical", 90, 5, "", 0);
+        addSkill("metal_slash", "金光斩", "金", "magical", 135, 20, "", 0);
+        addSkill("metal_finger", "裂金指", "金", "magical", 110, 12, "", 0);
+        addSkill("metal_poison", "金毒针", "金", "magical", 95, 28, "中毒", 3);
 
-        addSkill("wood_vine", "青藤术", "木", "physical", 100, 0, "", 0);
+        addSkill("wood_vine", "青藤术", "木", "magical", 90, 5, "", 0);
         addSkill("wood_heal", "长春功", "木", "heal", 30, 25, "", 0);
-        addSkill("wood_whip", "毒藤鞭", "木", "physical", 110, 0, "", 0);
-        addSkill("wood_poison", "腐毒术", "木", "magical", 90, 25, "中毒", 3);
+        addSkill("wood_whip", "毒藤鞭", "木", "magical", 105, 12, "", 0);
+        addSkill("wood_poison", "腐毒术", "木", "magical", 85, 24, "中毒", 3);
 
-        addSkill("water_arrow", "水箭术", "水", "magical", 100, 0, "", 0);
-        addSkill("water_ice", "玄冰刺", "水", "magical", 140, 25, "", 0);
-        addSkill("water_dragon", "水龙卷", "水", "magical", 130, 30, "", 0);
-        addSkill("water_slow", "寒毒咒", "水", "magical", 100, 35, "减速", 2);
+        addSkill("water_arrow", "水箭术", "水", "magical", 90, 5, "", 0);
+        addSkill("water_ice", "玄冰刺", "水", "magical", 125, 22, "", 0);
+        addSkill("water_dragon", "水龙卷", "水", "magical", 120, 28, "", 0);
+        addSkill("water_slow", "寒毒咒", "水", "magical", 90, 30, "减速", 2);
 
-        addSkill("fire_bolt", "火弹术", "火", "magical", 100, 0, "", 0);
-        addSkill("fire_flame", "烈焰术", "火", "magical", 180, 30, "", 0);
-        addSkill("fire_rain", "火雨术", "火", "magical", 150, 35, "", 0);
-        addSkill("fire_burn", "炎毒术", "火", "magical", 120, 40, "灼烧", 3);
+        addSkill("fire_bolt", "火弹术", "火", "magical", 90, 5, "", 0);
+        addSkill("fire_flame", "烈焰术", "火", "magical", 150, 30, "", 0);
+        addSkill("fire_rain", "火雨术", "火", "magical", 130, 34, "", 0);
+        addSkill("fire_burn", "炎毒术", "火", "magical", 105, 36, "灼烧", 3);
 
-        addSkill("earth_stone", "落石术", "土", "physical", 100, 0, "", 0);
-        addSkill("earth_spike", "地刺术", "土", "magical", 130, 20, "", 0);
-        addSkill("earth_rock", "飞岩术", "土", "physical", 140, 0, "", 0);
-        addSkill("earth_poison", "土毒咒", "土", "magical", 110, 30, "中毒", 3);
+        addSkill("earth_stone", "落石术", "土", "magical", 90, 5, "", 0);
+        addSkill("earth_spike", "地刺术", "土", "magical", 120, 20, "", 0);
+        addSkill("earth_rock", "飞岩术", "土", "magical", 125, 24, "", 0);
+        addSkill("earth_poison", "土毒咒", "土", "magical", 100, 28, "中毒", 3);
 
         addEquipment("bamboo_sword", "青竹剑", "weapon", "凡品", "以灵竹削成的轻剑，锋利不足，却适合初入仙途的散修练手。", 6, 0, 0, 0, 80);
         addEquipment("steel_sword", "精钢剑", "weapon", "良品", "凡铁百炼而成，剑身沉稳，可明显提升武力。", 14, 0, 0, 0, 280);
+        addEquipment("ice_sword", "寒冰剑", "weapon", "精品", "剑锋凝寒，出鞘时带有细微冰雾，适合中期斗法。", 24, 0, 0, 0, 720);
+        addEquipment("gold_light_sword", "金光剑", "weapon", "灵品", "剑身常有金芒流转，可大幅增强攻伐之力。", 38, 0, 0, 0, 1500);
+        addEquipment("qingyuan_sword", "青元剑", "weapon", "仙品", "以青元灵纹炼成的上品飞剑，锋锐而通灵。", 58, 0, 0, 0, 3200);
         addEquipment("spirit_pearl", "聚灵珠", "focus", "凡品", "能微弱聚拢灵气的小珠，适合法术入门者佩戴。", 0, 6, 0, 0, 80);
         addEquipment("jade_pearl", "玄玉珠", "focus", "良品", "温润玄玉炼成的法器，能让灵力运转更顺畅。", 0, 14, 0, 0, 280);
+        addEquipment("soul_bell", "定魂钟", "focus", "精品", "钟声能稳固神识，使法术更易成形。", 0, 24, 0, 0, 720);
+        addEquipment("spirit_bell", "摄魂铃", "focus", "灵品", "铃音细密，可牵引灵力爆发出更强法术。", 0, 38, 0, 0, 1500);
+        addEquipment("void_cauldron", "虚天鼎", "focus", "仙品", "传闻曾镇压一方虚空，蕴藏深厚灵机。", 0, 58, 0, 0, 3200);
         addEquipment("cloth_robe", "灰布道袍", "armor", "凡品", "旧布缝成的道袍，虽不华贵，却能挡去些许风霜。", 0, 0, 5, 0, 80);
         addEquipment("bronze_armor", "青铜铠甲", "armor", "良品", "刻有简易护身纹的青铜甲，适合早期硬抗妖兽利爪。", 0, 0, 13, 0, 260);
+        addEquipment("dark_iron_armor", "玄铁战甲", "armor", "精品", "玄铁锻成的战甲，沉重却可靠。", 0, 0, 23, 0, 680);
+        addEquipment("cold_jade_armor", "寒玉宝甲", "armor", "灵品", "寒玉片层层相扣，可抵御强横法术余波。", 0, 0, 36, 0, 1450);
+        addEquipment("silkworm_robe", "天蚕宝衣", "armor", "仙品", "天蚕丝织成的宝衣，轻若无物而坚韧异常。", 0, 0, 54, 0, 3000);
         addEquipment("straw_shoes", "草鞋", "boots", "凡品", "山路常见的草鞋，轻便但不耐久。", 0, 0, 0, 3, 50);
         addEquipment("cloth_boots", "布靴", "boots", "良品", "鞋底缝入轻身符线，行动更灵活。", 0, 0, 0, 8, 180);
+        addEquipment("swift_boots", "疾风靴", "boots", "精品", "靴面有疾风纹，能显著提高身法。", 0, 0, 0, 15, 520);
+        addEquipment("chasing_wind_boots", "追风靴", "boots", "灵品", "踏地无声，适合抢占战斗先机。", 0, 0, 0, 25, 1180);
+        addEquipment("divine_walk_boots", "神行靴", "boots", "仙品", "传闻可一念越过百丈山道。", 0, 0, 0, 40, 2600);
 
         addItem("huanglong_pill", "黄龙丹", "pill", "凡品", "入门修士常备的疗伤丹药，使用后恢复30%体力。", 40, 30, 0);
         addItem("heqi_pill", "合气丹", "pill", "凡品", "调和气海的小丹，使用后恢复30%灵力。", 40, 0, 30);
         addItem("huiyuan_pill", "回元丹", "pill", "良品", "药力温和稳定，使用后同时恢复30%体力与灵力。", 120, 30, 30);
-        addItem("breakthrough_pill", "突破丹", "breakthrough", "良品", "冲击筑基期所需丹药，当前版本突破消耗1枚。", 300, 0, 0);
+        addItem("foundation_recovery_pill", "筑基丹", "pill", "精品", "药力厚重，使用后恢复60%体力。", 180, 60, 0);
+        addItem("stabilizing_pill", "定灵丹", "pill", "精品", "稳固灵台，使用后恢复60%灵力。", 180, 0, 60);
+        addItem("creation_pill", "造化丹", "pill", "灵品", "少见的恢复灵丹，使用后同时恢复60%体力与灵力。", 420, 60, 60);
+        addItem("breakthrough_pill", "突破丹", "breakthrough", "良品", "冲击境界瓶颈所需丹药，每次突破都会消耗1枚。", 300, 0, 0);
         addManual("manual_metal_poison", "金毒针秘籍", "良品", "记载金毒针的秘籍，可让金属性角色学习中毒法术。", 360, "metal_poison");
         addManual("manual_wood_poison", "腐毒术秘籍", "良品", "记载腐毒术的秘籍，可让木属性角色学习中毒法术。", 360, "wood_poison");
         addManual("manual_water_slow", "寒毒咒秘籍", "良品", "记载寒毒咒的秘籍，可让水属性角色学习减速法术。", 360, "water_slow");
@@ -65,6 +80,10 @@ public final class Catalog {
         addTreasure("binding_charm", "定身符", "凡品", "stun", "enemy", "战斗中使一名敌人眩晕1回合，每场每名角色只能使用一次法宝。", 30, 1, 260);
         addTreasure("spring_charm", "回春符", "良品", "heal", "ally", "战斗中恢复一名队友50%最大体力。", 40, 50, 420);
         addTreasure("spirit_charm", "聚灵符", "良品", "mp", "ally", "战斗中恢复一名队友50%最大灵力。", 40, 50, 420);
+        addTreasure("stun_bell", "眩晕铃", "精品", "stun", "enemy", "铃声刺入神识，使一名敌人眩晕1回合。", 40, 1, 680);
+        addTreasure("monster_rope", "缚妖索", "精品", "stun", "enemy", "以灵索束缚目标，使一名敌人眩晕2回合。", 50, 2, 920);
+        addTreasure("revival_charm", "还魂符", "灵品", "heal", "ally", "以符力护住生机，恢复一名队友80%最大体力。", 80, 80, 1500);
+        addTreasure("heaven_charm", "天罡符", "灵品", "mp", "ally", "引天罡之气入体，恢复一名队友80%最大灵力。", 90, 80, 1600);
     }
 
     private Catalog() {

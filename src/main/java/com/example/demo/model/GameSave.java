@@ -19,4 +19,5 @@ public class GameSave {
     public Map<String, Integer> equipmentBag = new LinkedHashMap<>();
     public Map<String, Integer> treasureBag = new LinkedHashMap<>();
     public List<String> codex = new ArrayList<>();
+    public List<String> codexRewardsClaimed = new ArrayList<>();
 }

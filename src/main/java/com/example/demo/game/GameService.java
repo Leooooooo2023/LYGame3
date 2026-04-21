@@ -29,6 +29,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class GameService {
+    private static final List<String> REALMS = List.of("炼气期", "筑基期", "金丹期", "元婴期", "化神期", "炼虚期", "合体期", "大乘期", "渡劫期", "真仙期");
+
     private final ObjectMapper objectMapper;
     private final Path savePath = Path.of("data", "saves.json");
     private final Map<String, GameSave> saves = new ConcurrentHashMap<>();
@@ -74,11 +76,7 @@ public class GameService {
         CharacterState player = createPlayer(trimmed, gender, element);
         save.party.add(player);
 
-        save.companions.add(createCompanion("companion_lifeiyu", "厉飞雨", "男", "金", false));
-        save.companions.add(createCompanion("companion_chenqiaoqian", "陈巧倩", "女", "木", false));
-        save.companions.add(createCompanion("companion_yuanyao", "元瑶", "女", "水", false));
-        save.companions.add(createCompanion("companion_ziling", "紫灵", "女", "火", false));
-        save.companions.add(createCompanion("companion_xinruyin", "辛如音", "女", "土", false));
+        seedCompanions(save);
 
         save.inventory.put("huanglong_pill", 5);
         save.inventory.put("heqi_pill", 5);
@@ -216,6 +214,22 @@ public class GameService {
         return save;
     }
 
+    public GameSave decomposeEquipment(String saveId, String equipmentId, int quantity) {
+        GameSave save = getSave(saveId);
+        EquipmentDef equipment = Catalog.EQUIPMENT.get(equipmentId);
+        if (equipment == null) {
+            throw new IllegalArgumentException("装备不存在");
+        }
+        int count = Math.max(1, quantity);
+        if (save.equipmentBag.getOrDefault(equipmentId, 0) < count) {
+            throw new IllegalArgumentException("背包装备数量不足");
+        }
+        addCount(save.equipmentBag, equipmentId, -count);
+        save.resources.spiritStones += decomposeValue(equipment.price, count);
+        persist(save);
+        return save;
+    }
+
     public GameSave equipTreasure(String saveId, String characterId, String treasureId) {
         GameSave save = getSave(saveId);
         MagicTreasureDef treasure = Catalog.TREASURES.get(treasureId);
@@ -244,6 +258,22 @@ public class GameService {
         }
         addCount(save.treasureBag, character.treasure, 1);
         character.treasure = null;
+        persist(save);
+        return save;
+    }
+
+    public GameSave decomposeTreasure(String saveId, String treasureId, int quantity) {
+        GameSave save = getSave(saveId);
+        MagicTreasureDef treasure = Catalog.TREASURES.get(treasureId);
+        if (treasure == null) {
+            throw new IllegalArgumentException("法宝不存在");
+        }
+        int count = Math.max(1, quantity);
+        if (save.treasureBag.getOrDefault(treasureId, 0) < count) {
+            throw new IllegalArgumentException("背包法宝数量不足");
+        }
+        addCount(save.treasureBag, treasureId, -count);
+        save.resources.spiritStones += decomposeValue(treasure.price, count);
         persist(save);
         return save;
     }
@@ -303,20 +333,51 @@ public class GameService {
         return save;
     }
 
+    public GameSave claimCodexReward(String saveId, String rewardId) {
+        GameSave save = getSave(saveId);
+        CodexReward reward = codexReward(rewardId);
+        if (reward == null) {
+            throw new IllegalArgumentException("图鉴奖励不存在");
+        }
+        if (save.codexRewardsClaimed.contains(reward.id)) {
+            throw new IllegalArgumentException("该图鉴奖励已经领取");
+        }
+        if (save.codex.size() < reward.required) {
+            throw new IllegalArgumentException("图鉴收集数量不足");
+        }
+        save.resources.spiritStones += reward.stones;
+        save.resources.fiveElementEssence += reward.essence;
+        save.resources.breakthroughPill += reward.pills;
+        save.codexRewardsClaimed.add(reward.id);
+        persist(save);
+        return save;
+    }
+
     public GameSave breakthrough(String saveId, String characterId) {
         GameSave save = getSave(saveId);
         CharacterState character = findCharacter(save, characterId);
-        if (character.level < 5) {
-            throw new IllegalArgumentException("角色达到 5 级后才能突破到筑基期");
+        int currentRealmIndex = REALMS.indexOf(character.realm);
+        if (currentRealmIndex < 0) {
+            currentRealmIndex = 0;
+        }
+        if (currentRealmIndex >= REALMS.size() - 1) {
+            throw new IllegalArgumentException("已经抵达当前版本最高境界");
+        }
+        String nextRealm = REALMS.get(currentRealmIndex + 1);
+        int requiredLevel = (currentRealmIndex + 1) * 5;
+        int failureRate = breakthroughFailureRate(character);
+        if (character.level < requiredLevel) {
+            throw new IllegalArgumentException("角色达到 " + requiredLevel + " 级后才能突破到" + nextRealm);
         }
         if (save.resources.breakthroughPill <= 0) {
             throw new IllegalArgumentException("需要突破丹 ×1");
         }
-        if ("筑基期".equals(character.realm)) {
-            throw new IllegalArgumentException("v0.1 暂时只开放到筑基期");
-        }
         save.resources.breakthroughPill -= 1;
-        character.realm = "筑基期";
+        if (random.nextInt(100) < failureRate) {
+            persist(save);
+            throw new IllegalStateException(character.name + " 渡劫失败，消耗突破丹 ×1。当前境界失败率为 " + failureRate + "%，请提升等级和资源后再试。");
+        }
+        character.realm = nextRealm;
         character.realmLevel = 1;
         character.maxHp = character.maxHp * 3 / 2;
         character.maxMp = character.maxMp * 3 / 2;
@@ -326,7 +387,7 @@ public class GameService {
         character.agility = character.agility * 3 / 2;
         character.hp = character.maxHp;
         character.mp = character.maxMp;
-        addCodex(save, "筑基期");
+        addCodex(save, nextRealm);
         persist(save);
         return save;
     }
@@ -384,6 +445,14 @@ public class GameService {
         return startBattle(save, element + "行试炼洞", "trial_" + element, difficulty, false);
     }
 
+    public BattleSession startWorldBoss(String saveId, String bossId, String difficultyName) {
+        GameSave save = getSave(saveId);
+        BossDifficulty bossDifficulty = bossDifficulty(difficultyName);
+        CharacterState boss = createWorldBoss(bossId, bossDifficulty.level);
+        String title = boss.name + " · " + bossDifficulty.name;
+        return startBattle(save, title, "boss_" + bossId + "_" + bossDifficulty.id, bossDifficulty.level, false, List.of(boss));
+    }
+
     public BattleSession getBattle(String battleId) {
         BattleSession battle = battles.get(battleId);
         if (battle == null) {
@@ -398,15 +467,14 @@ public class GameService {
             return battle;
         }
         if (!battle.waitingForPlayer) {
-            advanceBattle(battle);
+            promptNextPlayerOrResolve(battle);
             return battle;
         }
         GameSave save = getSave(battle.saveId);
         CharacterState actor = findLivingById(save.party, battle.currentActorId);
         if (actor == null) {
             battle.waitingForPlayer = false;
-            battle.turnIndex++;
-            advanceBattle(battle);
+            promptNextPlayerOrResolve(battle);
             return battle;
         }
 
@@ -417,8 +485,8 @@ public class GameService {
                 if (target == null) {
                     throw new IllegalArgumentException("请选择可攻击的敌人");
                 }
-                SkillDef basic = Catalog.SKILLS.get(actor.skills.get(0));
-                performSkill(actor, target, basic, battle.logs);
+                battle.pendingActions.put(actor.id, copyAction(request));
+                battle.logs.add(actor.name + " 已选择普通攻击，等待本回合结算。");
             }
             case "skill" -> {
                 SkillDef skill = Catalog.SKILLS.get(request.skillId);
@@ -429,18 +497,16 @@ public class GameService {
                     throw new IllegalArgumentException("灵力不足，无法施展该技能");
                 }
                 if ("heal".equals(skill.type)) {
-                    CharacterState target = findLivingById(save.party, request.targetId);
-                    if (target == null) {
+                    if (findLivingById(save.party, request.targetId) == null) {
                         throw new IllegalArgumentException("请选择要恢复的队友");
                     }
-                    performHeal(actor, target, skill, battle.logs);
                 } else {
-                    CharacterState target = findLivingById(battle.enemies, request.targetId);
-                    if (target == null) {
+                    if (findLivingById(battle.enemies, request.targetId) == null) {
                         throw new IllegalArgumentException("请选择可攻击的敌人");
                     }
-                    performSkill(actor, target, skill, battle.logs);
                 }
+                battle.pendingActions.put(actor.id, copyAction(request));
+                battle.logs.add(actor.name + " 已选择技能 " + skill.name + "，等待本回合结算。");
             }
             case "item" -> {
                 ItemDef item = Catalog.ITEMS.get(request.itemId);
@@ -450,11 +516,11 @@ public class GameService {
                 if (save.inventory.getOrDefault(request.itemId, 0) <= 0) {
                     throw new IllegalArgumentException("丹药数量不足");
                 }
-                CharacterState target = findCharacter(save, request.targetId);
-                target.hp = Math.min(target.maxHp, target.hp + target.maxHp * item.hpPercent / 100);
-                target.mp = Math.min(target.maxMp, target.mp + target.maxMp * item.mpPercent / 100);
-                addCount(save.inventory, request.itemId, -1);
-                battle.logs.add(actor.name + " 使用 " + item.name + "，为 " + target.name + " 恢复状态。");
+                if (findLivingById(save.party, request.targetId) == null) {
+                    throw new IllegalArgumentException("请选择要恢复的队友");
+                }
+                battle.pendingActions.put(actor.id, copyAction(request));
+                battle.logs.add(actor.name + " 已选择使用 " + item.name + "，等待本回合结算。");
             }
             case "treasure" -> {
                 if (actor.treasure == null || actor.treasure.isBlank()) {
@@ -478,6 +544,16 @@ public class GameService {
                 }
                 performTreasure(actor, target, treasure, battle.logs);
                 battle.usedTreasures.put(actor.id, true);
+                checkBattleEnd(battle);
+                if (battle.finished) {
+                    finishBattle(battle);
+                } else {
+                    battle.currentActorId = actor.id;
+                    battle.waitingForPlayer = true;
+                    battle.save = save;
+                    persist(save);
+                }
+                return battle;
             }
             case "escape" -> {
                 battle.finished = true;
@@ -492,13 +568,7 @@ public class GameService {
         }
 
         battle.waitingForPlayer = false;
-        battle.turnIndex++;
-        checkBattleEnd(battle);
-        if (!battle.finished) {
-            advanceBattle(battle);
-        } else {
-            finishBattle(battle);
-        }
+        promptNextPlayerOrResolve(battle);
         persist(save);
         battle.save = save;
         return battle;
@@ -515,6 +585,10 @@ public class GameService {
     }
 
     private BattleSession startBattle(GameSave save, String title, String type, int difficulty, boolean tower) {
+        return startBattle(save, title, type, difficulty, tower, null);
+    }
+
+    private BattleSession startBattle(GameSave save, String title, String type, int difficulty, boolean tower, List<CharacterState> fixedEnemies) {
         if (save.party.stream().noneMatch(this::alive)) {
             throw new IllegalArgumentException("队伍已经无力再战，请先前往客栈恢复");
         }
@@ -525,62 +599,51 @@ public class GameService {
         battle.type = type;
         battle.difficulty = difficulty;
         battle.tower = tower;
-        battle.enemies = createEnemies(difficulty, Math.max(1, save.party.size()));
+        battle.enemies = fixedEnemies == null ? createEnemies(difficulty, Math.max(1, save.party.size())) : fixedEnemies;
         for (CharacterState enemy : battle.enemies) {
             addCodex(save, enemy.name);
         }
         battle.logs.add("进入" + title + "，敌方出现：" + names(battle.enemies));
         battle.save = save;
         battles.put(battle.id, battle);
-        advanceBattle(battle);
+        preparePlanningRound(battle, save);
+        promptNextPlayerOrResolve(battle);
         persist(save);
         return battle;
     }
 
-    private void advanceBattle(BattleSession battle) {
+    private void promptNextPlayerOrResolve(BattleSession battle) {
         GameSave save = getSave(battle.saveId);
         battle.save = save;
-        while (!battle.finished) {
-            checkBattleEnd(battle);
-            if (battle.finished) {
-                finishBattle(battle);
-                return;
-            }
-            if (battle.turnOrder.isEmpty() || battle.turnIndex >= battle.turnOrder.size()) {
-                prepareRound(battle, save);
-            }
-
-            CharacterState actor = findAnyActor(save, battle, battle.turnOrder.get(battle.turnIndex));
-            if (actor == null || !alive(actor)) {
-                battle.turnIndex++;
-                continue;
-            }
-            applyStatuses(actor, battle.logs);
-            if (!alive(actor)) {
-                battle.turnIndex++;
-                continue;
-            }
-            if (actor.statuses.getOrDefault("眩晕", 0) > 0 || actor.statuses.getOrDefault("束缚", 0) > 0) {
-                battle.logs.add(actor.name + " 被控制，无法行动。");
-                tickStatus(actor, "眩晕");
-                tickStatus(actor, "束缚");
-                battle.turnIndex++;
-                continue;
-            }
-
-            if (save.party.contains(actor)) {
-                battle.currentActorId = actor.id;
-                battle.waitingForPlayer = true;
-                return;
-            }
-
-            takeAction(actor, battle.enemies, save.party, battle.logs);
-            battle.turnIndex++;
+        checkBattleEnd(battle);
+        if (battle.finished) {
+            finishBattle(battle);
+            return;
         }
+        CharacterState next = save.party.stream()
+                .filter(this::alive)
+                .filter(character -> !battle.pendingActions.containsKey(character.id))
+                .findFirst()
+                .orElse(null);
+        if (next != null) {
+            battle.currentActorId = next.id;
+            battle.waitingForPlayer = true;
+            return;
+        }
+        resolveQueuedRound(battle, save);
     }
 
-    private void prepareRound(BattleSession battle, GameSave save) {
+    private void preparePlanningRound(BattleSession battle, GameSave save) {
         battle.round++;
+        battle.turnIndex = 0;
+        battle.turnOrder = new ArrayList<>();
+        battle.pendingActions.clear();
+        battle.logs.add("第 " + battle.round + " 回合：请选择我方行动，全部选择后按敏捷结算。");
+    }
+
+    private void resolveQueuedRound(BattleSession battle, GameSave save) {
+        battle.waitingForPlayer = false;
+        battle.currentActorId = null;
         battle.turnIndex = 0;
         battle.turnOrder = new ArrayList<>();
         List<CharacterState> order = new ArrayList<>();
@@ -588,7 +651,112 @@ public class GameService {
         order.addAll(battle.enemies.stream().filter(this::alive).toList());
         order.sort(Comparator.comparingInt(this::totalAgility).reversed());
         battle.turnOrder.addAll(order.stream().map(c -> c.id).toList());
-        battle.logs.add("第 " + battle.round + " 回合");
+        battle.logs.add("第 " + battle.round + " 回合开始结算。");
+
+        for (CharacterState actor : order) {
+            battle.turnIndex++;
+            checkBattleEnd(battle);
+            if (battle.finished) {
+                break;
+            }
+            if (!alive(actor)) {
+                continue;
+            }
+            applyStatuses(actor, battle.logs);
+            if (!alive(actor)) {
+                continue;
+            }
+            if (actor.statuses.getOrDefault("眩晕", 0) > 0 || actor.statuses.getOrDefault("束缚", 0) > 0) {
+                battle.logs.add(actor.name + " 被控制，无法行动。");
+                tickStatus(actor, "眩晕");
+                tickStatus(actor, "束缚");
+                continue;
+            }
+            if (save.party.contains(actor)) {
+                BattleActionRequest action = battle.pendingActions.get(actor.id);
+                if (action != null) {
+                    executeQueuedPlayerAction(battle, save, actor, action);
+                }
+            } else {
+                takeAction(actor, battle.enemies, save.party, battle.logs);
+            }
+        }
+
+        battle.pendingActions.clear();
+        checkBattleEnd(battle);
+        if (battle.finished) {
+            finishBattle(battle);
+            return;
+        }
+        preparePlanningRound(battle, save);
+        promptNextPlayerOrResolve(battle);
+    }
+
+    private void executeQueuedPlayerAction(BattleSession battle, GameSave save, CharacterState actor, BattleActionRequest request) {
+        String action = request.action == null ? "" : request.action;
+        switch (action) {
+            case "attack" -> {
+                CharacterState target = findLivingById(battle.enemies, request.targetId);
+                if (target == null) {
+                    target = firstLiving(battle.enemies);
+                }
+                if (target != null) {
+                    performBasicAttack(actor, target, battle.logs);
+                }
+            }
+            case "skill" -> {
+                SkillDef skill = Catalog.SKILLS.get(request.skillId);
+                if (skill == null || !actor.skills.contains(request.skillId)) {
+                    battle.logs.add(actor.name + " 的技能指令失效。");
+                    return;
+                }
+                if (actor.mp < skill.mpCost) {
+                    battle.logs.add(actor.name + " 灵力不足，技能未能施展。");
+                    CharacterState fallback = firstLiving(battle.enemies);
+                    if (fallback != null && !"heal".equals(skill.type)) {
+                        performBasicAttack(actor, fallback, battle.logs);
+                    }
+                    return;
+                }
+                if ("heal".equals(skill.type)) {
+                    CharacterState target = findLivingById(save.party, request.targetId);
+                    if (target != null) {
+                        performHeal(actor, target, skill, battle.logs);
+                    }
+                } else {
+                    CharacterState target = findLivingById(battle.enemies, request.targetId);
+                    if (target == null) {
+                        target = firstLiving(battle.enemies);
+                    }
+                    if (target != null) {
+                        performSkill(actor, target, skill, battle.logs);
+                    }
+                }
+            }
+            case "item" -> {
+                ItemDef item = Catalog.ITEMS.get(request.itemId);
+                CharacterState target = findLivingById(save.party, request.targetId);
+                if (item == null || target == null || save.inventory.getOrDefault(request.itemId, 0) <= 0) {
+                    battle.logs.add(actor.name + " 的丹药指令失效。");
+                    return;
+                }
+                target.hp = Math.min(target.maxHp, target.hp + target.maxHp * item.hpPercent / 100);
+                target.mp = Math.min(target.maxMp, target.mp + target.maxMp * item.mpPercent / 100);
+                addCount(save.inventory, request.itemId, -1);
+                battle.logs.add(actor.name + " 使用 " + item.name + "，为 " + target.name + " 恢复状态。");
+            }
+            default -> battle.logs.add(actor.name + " 的行动指令失效。");
+        }
+    }
+
+    private BattleActionRequest copyAction(BattleActionRequest request) {
+        BattleActionRequest copy = new BattleActionRequest();
+        copy.action = request.action;
+        copy.skillId = request.skillId;
+        copy.itemId = request.itemId;
+        copy.treasureId = request.treasureId;
+        copy.targetId = request.targetId;
+        return copy;
     }
 
     private void checkBattleEnd(BattleSession battle) {
@@ -625,9 +793,10 @@ public class GameService {
         if (battle.spiritStones > 0 || battle.exp > 0) {
             return;
         }
-        battle.spiritStones = 120 + battle.difficulty * 40;
-        battle.essence = battle.tower ? Math.max(1, battle.difficulty / 3) : 1;
-        battle.exp = 80 + battle.difficulty * 35;
+        boolean bossBattle = battle.type != null && battle.type.startsWith("boss_");
+        battle.spiritStones = bossBattle ? 600 + battle.difficulty * 80 : 120 + battle.difficulty * 40;
+        battle.essence = bossBattle ? 5 + Math.max(1, battle.difficulty / 4) : battle.tower ? Math.max(1, battle.difficulty / 3) : 1;
+        battle.exp = bossBattle ? 260 + battle.difficulty * 60 : 80 + battle.difficulty * 35;
         save.resources.spiritStones += battle.spiritStones;
         save.resources.fiveElementEssence += battle.essence;
         for (CharacterState character : save.party) {
@@ -659,6 +828,19 @@ public class GameService {
                 addCount(save.inventory, manual.id, 1);
                 addCodex(save, manual.name);
                 battle.drops.add(manual.name + " ×1");
+            }
+        }
+        if (bossBattle) {
+            int pillCount = battle.difficulty >= 20 ? 2 : 1;
+            save.resources.breakthroughPill += pillCount;
+            battle.drops.add("突破丹 ×" + pillCount);
+            addCodex(save, "突破丹");
+            String rareDrop = battle.type.contains("wanmo") ? "revival_charm" : "heaven_charm";
+            MagicTreasureDef treasure = Catalog.TREASURES.get(rareDrop);
+            if (treasure != null && random.nextInt(100) < 45) {
+                addCount(save.treasureBag, treasure.id, 1);
+                addCodex(save, treasure.name);
+                battle.drops.add(treasure.name + " ×1");
             }
         }
         battle.logs.add("战斗胜利，获得灵石 " + battle.spiritStones + "、五行精华 " + battle.essence + "、经验 " + battle.exp + "。");
@@ -717,6 +899,15 @@ public class GameService {
         }
     }
 
+    private void performBasicAttack(CharacterState actor, CharacterState target, List<String> logs) {
+        int damage = Math.max(1, totalAttack(actor) * 80 / 100 - totalDefense(target) / 2);
+        if (hasAdvantage(actor.element, target.element)) {
+            damage = damage * 6 / 5;
+        }
+        target.hp = Math.max(0, target.hp - damage);
+        logs.add(actor.name + " 普通攻击 " + target.name + "，造成 " + damage + " 伤害。");
+    }
+
     private void performTreasure(CharacterState actor, CharacterState target, MagicTreasureDef treasure, List<String> logs) {
         actor.mp -= treasure.mpCost;
         switch (treasure.effectType) {
@@ -759,6 +950,10 @@ public class GameService {
 
     private CharacterState findLivingById(List<CharacterState> characters, String id) {
         return characters.stream().filter(c -> c.id.equals(id)).filter(this::alive).findFirst().orElse(null);
+    }
+
+    private CharacterState firstLiving(List<CharacterState> characters) {
+        return characters.stream().filter(this::alive).findFirst().orElse(null);
     }
 
     private BattleResult runBattle(GameSave save, String title, int difficulty, boolean tower) {
@@ -848,29 +1043,22 @@ public class GameService {
                 .findFirst()
                 .orElse(null);
         SkillDef skill = chooseSkill(actor, weakAlly != null);
+        if (skill == null) {
+            CharacterState target = opponents.stream().filter(this::alive).min(Comparator.comparingInt(c -> c.hp)).orElse(null);
+            if (target != null) {
+                performBasicAttack(actor, target, logs);
+            }
+            return;
+        }
         if ("heal".equals(skill.type) && weakAlly != null) {
-            actor.mp -= skill.mpCost;
-            int amount = weakAlly.maxHp * skill.power / 100;
-            weakAlly.hp = Math.min(weakAlly.maxHp, weakAlly.hp + amount);
-            logs.add(actor.name + " 施展 " + skill.name + "，为 " + weakAlly.name + " 恢复 " + amount + " 体力。");
+            performHeal(actor, weakAlly, skill, logs);
             return;
         }
         CharacterState target = opponents.stream().filter(this::alive).min(Comparator.comparingInt(c -> c.hp)).orElse(null);
         if (target == null) {
             return;
         }
-        actor.mp -= skill.mpCost;
-        int source = "physical".equals(skill.type) ? totalAttack(actor) : totalMagic(actor);
-        int damage = Math.max(1, source * skill.power / 100 - totalDefense(target) / 2);
-        if (hasAdvantage(actor.element, target.element)) {
-            damage = damage * 6 / 5;
-        }
-        target.hp = Math.max(0, target.hp - damage);
-        logs.add(actor.name + " 使用 " + skill.name + " 攻击 " + target.name + "，造成 " + damage + " 伤害。");
-        if (!skill.status.isBlank() && alive(target) && random.nextInt(100) < 45) {
-            target.statuses.put(skill.status, skill.statusTurns);
-            logs.add(target.name + " 陷入" + skill.status + "状态。");
-        }
+        performSkill(actor, target, skill, logs);
     }
 
     private SkillDef chooseSkill(CharacterState actor, boolean shouldHeal) {
@@ -880,7 +1068,7 @@ public class GameService {
                 .filter(skill -> shouldHeal || !"heal".equals(skill.type))
                 .toList();
         if (usable.isEmpty()) {
-            return Catalog.SKILLS.get(actor.skills.get(0));
+            return null;
         }
         return usable.get(random.nextInt(usable.size()));
     }
@@ -932,6 +1120,30 @@ public class GameService {
         return enemies;
     }
 
+    private CharacterState createWorldBoss(String bossId, int difficulty) {
+        boolean wanmo = "wanmo".equals(bossId);
+        boolean xianling = "xianling".equals(bossId);
+        if (!wanmo && !xianling) {
+            throw new IllegalArgumentException("世界BOSS不存在");
+        }
+        CharacterState boss = new CharacterState();
+        boss.id = "boss_" + bossId + "_" + random.nextInt(9999);
+        boss.name = wanmo ? "古魔" : "灵界修士";
+        boss.gender = "未知";
+        boss.element = wanmo ? "火" : "水";
+        boss.level = difficulty + 5;
+        boss.maxHp = 260 + difficulty * 55;
+        boss.hp = boss.maxHp;
+        boss.maxMp = 120 + difficulty * 18;
+        boss.mp = boss.maxMp;
+        boss.attack = 34 + difficulty * 6;
+        boss.magic = 42 + difficulty * 7;
+        boss.defense = 22 + difficulty * 5;
+        boss.agility = 16 + difficulty * 2;
+        boss.skills.addAll(Catalog.initialSkills(boss.element));
+        return boss;
+    }
+
     private CharacterState createPlayer(String name, String gender, String element) {
         CharacterState player = new CharacterState();
         player.id = "player";
@@ -940,6 +1152,26 @@ public class GameService {
         player.element = element;
         player.skills.addAll(Catalog.initialSkills(element));
         return player;
+    }
+
+    private void seedCompanions(GameSave save) {
+        addMissingCompanion(save, "companion_nangongwan", "南宫婉", "女", "金");
+        addMissingCompanion(save, "companion_chenqiaoqian", "陈巧倩", "女", "木");
+        addMissingCompanion(save, "companion_yuanyao", "元瑶", "女", "水");
+        addMissingCompanion(save, "companion_ziling", "紫灵", "女", "火");
+        addMissingCompanion(save, "companion_xinruyin", "辛如音", "女", "土");
+        addMissingCompanion(save, "companion_lifeiyu", "厉飞雨", "男", "金");
+        addMissingCompanion(save, "companion_qiyunxiao", "齐云霄", "男", "木");
+        addMissingCompanion(save, "companion_mojiao", "墨蛟", "男", "水");
+        addMissingCompanion(save, "companion_xiangzhili", "向之礼", "男", "火");
+        addMissingCompanion(save, "companion_fengxi", "风希", "男", "土");
+    }
+
+    private void addMissingCompanion(GameSave save, String id, String name, String gender, String element) {
+        boolean exists = save.companions.stream().anyMatch(companion -> companion.id.equals(id));
+        if (!exists) {
+            save.companions.add(createCompanion(id, name, gender, element, false));
+        }
     }
 
     private CharacterState createCompanion(String id, String name, String gender, String element, boolean unlocked) {
@@ -1020,6 +1252,43 @@ public class GameService {
         return character.companion ? character.affection / 5 : 0;
     }
 
+    private int breakthroughFailureRate(CharacterState character) {
+        int currentRealmIndex = REALMS.indexOf(character.realm);
+        if (currentRealmIndex < 0) {
+            currentRealmIndex = 0;
+        }
+        return Math.min(90, (currentRealmIndex + 1) * 10);
+    }
+
+    private int decomposeValue(int price, int quantity) {
+        return Math.max(1, price * Math.max(1, quantity) / 2);
+    }
+
+    private CodexReward codexReward(String rewardId) {
+        return switch (rewardId == null ? "" : rewardId) {
+            case "codex_10" -> new CodexReward("codex_10", 10, 300, 2, 0);
+            case "codex_25" -> new CodexReward("codex_25", 25, 800, 5, 1);
+            case "codex_50" -> new CodexReward("codex_50", 50, 1800, 10, 2);
+            case "codex_80" -> new CodexReward("codex_80", 80, 3500, 20, 3);
+            default -> null;
+        };
+    }
+
+    private BossDifficulty bossDifficulty(String difficulty) {
+        return switch (difficulty == null ? "" : difficulty) {
+            case "easy" -> new BossDifficulty("easy", "简单", 8);
+            case "hard" -> new BossDifficulty("hard", "困难", 22);
+            case "nightmare" -> new BossDifficulty("nightmare", "噩梦", 30);
+            default -> new BossDifficulty("normal", "普通", 14);
+        };
+    }
+
+    private record CodexReward(String id, int required, int stones, int essence, int pills) {
+    }
+
+    private record BossDifficulty(String id, String name, int level) {
+    }
+
     private void normalizeSave(GameSave save) {
         if (save.treasureBag == null) {
             save.treasureBag = new LinkedHashMap<>();
@@ -1030,6 +1299,13 @@ public class GameService {
         if (save.equipmentBag == null) {
             save.equipmentBag = new LinkedHashMap<>();
         }
+        if (save.companions == null) {
+            save.companions = new ArrayList<>();
+        }
+        if (save.codexRewardsClaimed == null) {
+            save.codexRewardsClaimed = new ArrayList<>();
+        }
+        seedCompanions(save);
         for (CharacterState character : save.party) {
             normalizeCharacter(character);
         }

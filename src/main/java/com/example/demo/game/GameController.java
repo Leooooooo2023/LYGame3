@@ -85,6 +85,11 @@ public class GameController {
         return gameService.unequip(id, request.characterId, request.slot);
     }
 
+    @PostMapping("/{id}/equip/decompose")
+    public GameSave decomposeEquipment(@PathVariable String id, @RequestBody SimpleRequest request) {
+        return gameService.decomposeEquipment(id, request.equipmentId, request.quantity);
+    }
+
     @PostMapping("/{id}/treasure/equip")
     public GameSave equipTreasure(@PathVariable String id, @RequestBody SimpleRequest request) {
         return gameService.equipTreasure(id, request.characterId, request.treasureId);
@@ -93,6 +98,11 @@ public class GameController {
     @PostMapping("/{id}/treasure/unequip")
     public GameSave unequipTreasure(@PathVariable String id, @RequestBody SimpleRequest request) {
         return gameService.unequipTreasure(id, request.characterId);
+    }
+
+    @PostMapping("/{id}/treasure/decompose")
+    public GameSave decomposeTreasure(@PathVariable String id, @RequestBody SimpleRequest request) {
+        return gameService.decomposeTreasure(id, request.treasureId, request.quantity);
     }
 
     @PostMapping("/{id}/manual/learn")
@@ -128,6 +138,16 @@ public class GameController {
     @PostMapping("/{id}/trial/{element}")
     public BattleSession startElementTrial(@PathVariable String id, @PathVariable String element) {
         return gameService.startElementTrial(id, element);
+    }
+
+    @PostMapping("/{id}/boss/{bossId}/{difficulty}")
+    public BattleSession startWorldBoss(@PathVariable String id, @PathVariable String bossId, @PathVariable String difficulty) {
+        return gameService.startWorldBoss(id, bossId, difficulty);
+    }
+
+    @PostMapping("/{id}/codex/reward")
+    public GameSave claimCodexReward(@PathVariable String id, @RequestBody SimpleRequest request) {
+        return gameService.claimCodexReward(id, request.rewardId);
     }
 
     @GetMapping("/battle/{battleId}")

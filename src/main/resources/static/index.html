@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>凡人修仙外传 v0.2</title>
+    <title>凡人修仙外传 v0.3</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -136,6 +136,7 @@
             background: rgba(0, 0, 0, 0.55);
             z-index: 10;
         }
+        .notice-mask { z-index: 80; }
         .modal {
             width: min(480px, 100%);
             border: 2px solid #171717;
@@ -143,6 +144,14 @@
             padding: 1.2rem;
             box-shadow: 10px 10px 0 rgba(0, 0, 0, 0.22);
         }
+        .shop-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 0.85rem;
+        }
+        .shop-list { max-height: 560px; overflow: auto; padding-right: 0.15rem; }
         .battlefield { display: grid; gap: 1rem; }
         .battle-side {
             display: grid;
@@ -253,7 +262,7 @@
     <main v-else-if="screen === 'about'" class="menu">
         <section class="title-block">
             <h2>关于游戏</h2>
-            <p class="subtitle">开发者：李涌 · 版本：v0.2 · 发布目标：修仙战斗与道友养成扩展</p>
+            <p class="subtitle">开发者：李涌 · 版本：v0.3 · 发布目标：世界BOSS、图鉴奖励与装备法宝分解</p>
             <div class="stack">
                 <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、秘籍学习、法宝使用、五行试炼、境界突破。</p>
                 <button @click="screen = 'menu'">返回</button>
@@ -296,7 +305,7 @@
                     <div class="battlefield">
                         <div>
                             <h3>{{ battle.title }}</h3>
-                            <p class="muted">第 {{ battle.round }} 回合 · 当前行动：{{ currentActor?.name || '等待' }}</p>
+                            <p class="muted">第 {{ battle.round }} 回合 · 当前选择：{{ currentActor?.name || '等待结算' }} · 已选择 {{ plannedActionCount }}/{{ livingPartyCount }}</p>
                         </div>
 
                         <section>
@@ -330,8 +339,8 @@
                         </section>
 
                         <section class="action-panel">
-                            <h3>{{ currentActor?.name }} 行动</h3>
-                            <p class="muted">选择行动后，再指定目标。</p>
+                            <h3>{{ currentActor?.name }} 本回合指令</h3>
+                            <p class="muted">所有我方角色选择完毕后，将按敏捷顺序统一结算；法宝会立即生效且不占用本回合行动。</p>
                             <div class="row" style="margin-top: 0.8rem">
                                 <button @click="setPendingAttack">普通攻击</button>
                                 <button @click="battleActionMode = battleActionMode === 'skills' ? null : 'skills'">技能</button>
@@ -413,17 +422,29 @@
                         <article class="card">
                             <h3>丹药</h3>
                             <div class="list" style="margin-top: 0.65rem">
-                                <div v-for="(count, id) in save.inventory" :key="id" class="card">
+                                <div v-for="entry in ownedPillItems" :key="entry.id" class="card">
                                     <div class="row">
-                                        <strong :class="'quality-' + item(id).quality">{{ itemName(id) }} ×{{ count }}</strong>
-                                        <template v-if="item(id).category === 'pill'">
-                                            <button v-for="role in save.party" :key="role.id" @click="usePill(role.id, id)">给{{ role.name }}</button>
-                                        </template>
-                                        <button v-if="item(id).category === 'manual'" @click="openManualDialog(id)">学习</button>
+                                        <strong :class="'quality-' + item(entry.id).quality">{{ itemName(entry.id) }} ×{{ entry.count }}</strong>
+                                        <button v-for="role in save.party" :key="role.id" @click="usePill(role.id, entry.id)">给{{ role.name }}</button>
                                     </div>
-                                    <p class="desc">{{ item(id).description }}</p>
-                                    <p class="muted">{{ itemEffect(id) }}</p>
+                                    <p class="desc">{{ item(entry.id).description }}</p>
+                                    <p class="muted">{{ itemEffect(entry.id) }}</p>
                                 </div>
+                                <p v-if="!ownedPillItems.length" class="muted">暂无丹药。</p>
+                            </div>
+                        </article>
+                        <article class="card">
+                            <h3>秘籍</h3>
+                            <div class="list" style="margin-top: 0.65rem">
+                                <div v-for="entry in ownedManualItems" :key="entry.id" class="card">
+                                    <div class="row">
+                                        <strong :class="'quality-' + item(entry.id).quality">{{ itemName(entry.id) }} ×{{ entry.count }}</strong>
+                                        <button @click="openManualDialog(entry.id)">学习</button>
+                                    </div>
+                                    <p class="desc">{{ item(entry.id).description }}</p>
+                                    <p class="muted">{{ itemEffect(entry.id) }}</p>
+                                </div>
+                                <p v-if="!ownedManualItems.length" class="muted">暂无秘籍。</p>
                             </div>
                         </article>
                         <article class="card">
@@ -450,30 +471,52 @@
                 </template>
 
                 <template v-else-if="tab === 'shop'">
-                    <h3>坊市</h3>
-                    <div class="grid two" style="margin-top: 0.85rem">
+                    <div class="shop-head">
+                        <div>
+                            <h3>坊市</h3>
+                            <p class="muted">丹药、秘籍、装备和法宝分区购买，点击购买后确认数量。</p>
+                        </div>
+                        <strong>当前灵石 {{ save.resources.spiritStones }}</strong>
+                    </div>
+                    <div class="grid two">
                         <article class="card">
                             <h3>丹药</h3>
-                            <div class="list" style="margin-top: 0.65rem">
-                                <div v-for="item in shop.items" :key="item.id" class="card">
+                            <div class="list shop-list" style="margin-top: 0.65rem">
+                                <div v-for="item in shopPillItems" :key="item.id" class="card">
                                     <div class="row">
                                         <strong :class="'quality-' + item.quality">{{ item.name }} · {{ item.quality }}</strong>
                                         <span>{{ item.price }}灵石</span>
-                                        <button @click="buy(item.id)">购买</button>
+                                        <button @click="openBuyDialog(item.id)">购买</button>
                                     </div>
                                     <p class="desc">{{ item.description }}</p>
                                     <p class="muted">{{ itemEffect(item.id) }}</p>
                                 </div>
+                                <p v-if="!shopPillItems.length" class="muted">暂无丹药出售。</p>
+                            </div>
+                        </article>
+                        <article class="card">
+                            <h3>秘籍</h3>
+                            <div class="list shop-list" style="margin-top: 0.65rem">
+                                <div v-for="item in shopManualItems" :key="item.id" class="card">
+                                    <div class="row">
+                                        <strong :class="'quality-' + item.quality">{{ item.name }} · {{ item.quality }}</strong>
+                                        <span>{{ item.price }}灵石</span>
+                                        <button @click="openBuyDialog(item.id)">购买</button>
+                                    </div>
+                                    <p class="desc">{{ item.description }}</p>
+                                    <p class="muted">{{ itemEffect(item.id) }}</p>
+                                </div>
+                                <p v-if="!shopManualItems.length" class="muted">暂无秘籍出售。</p>
                             </div>
                         </article>
                         <article class="card">
                             <h3>装备</h3>
-                            <div class="list" style="margin-top: 0.65rem">
+                            <div class="list shop-list" style="margin-top: 0.65rem">
                                 <div v-for="eq in shop.equipment" :key="eq.id" class="card">
                                     <div class="row">
                                         <strong :class="'quality-' + eq.quality">{{ eq.name }} · {{ eq.quality }}</strong>
                                         <span>{{ eq.price }}灵石</span>
-                                        <button @click="buy(eq.id)">购买</button>
+                                        <button @click="openBuyDialog(eq.id)">购买</button>
                                     </div>
                                     <p class="desc">{{ eq.description }}</p>
                                     <p class="muted">{{ equipmentStats(eq.id) }}</p>
@@ -482,12 +525,12 @@
                         </article>
                         <article class="card">
                             <h3>法宝</h3>
-                            <div class="list" style="margin-top: 0.65rem">
+                            <div class="list shop-list" style="margin-top: 0.65rem">
                                 <div v-for="tr in shop.treasures" :key="tr.id" class="card">
                                     <div class="row">
                                         <strong :class="'quality-' + tr.quality">{{ tr.name }} · {{ tr.quality }}</strong>
                                         <span>{{ tr.price }}灵石</span>
-                                        <button @click="buy(tr.id)">购买</button>
+                                        <button @click="openBuyDialog(tr.id)">购买</button>
                                     </div>
                                     <p class="desc">{{ tr.description }}</p>
                                     <p class="muted">{{ treasureEffect(tr.id) }}</p>
@@ -523,7 +566,10 @@
                             </div>
                             <p class="desc">{{ equipment(entry.id).description }}</p>
                             <p class="muted">{{ slotName(equipment(entry.id).slot) }} · {{ equipmentStats(entry.id) }}</p>
-                            <button @click="openEquipDialog(entry.id)" :disabled="entry.count <= 0">选择装备角色</button>
+                            <div class="row">
+                                <button @click="openEquipDialog(entry.id)" :disabled="entry.count <= 0">选择装备角色</button>
+                                <button @click="decomposeEquipment(entry.id)" :disabled="entry.count <= 0">分解 +{{ decomposeValue(equipment(entry.id).price) }}灵石</button>
+                            </div>
                         </article>
                     </div>
                     <p v-if="!ownedEquipment.length" class="muted">背包里暂时没有可穿戴装备。</p>
@@ -550,7 +596,10 @@
                             </div>
                             <p class="desc">{{ treasure(entry.id).description }}</p>
                             <p class="muted">{{ treasureEffect(entry.id) }}</p>
-                            <button @click="openTreasureDialog(entry.id)" :disabled="entry.count <= 0">选择装备角色</button>
+                            <div class="row">
+                                <button @click="openTreasureDialog(entry.id)" :disabled="entry.count <= 0">选择装备角色</button>
+                                <button @click="decomposeTreasure(entry.id)" :disabled="entry.count <= 0">分解 +{{ decomposeValue(treasure(entry.id).price) }}灵石</button>
+                            </div>
                         </article>
                     </div>
                     <p v-if="!ownedTreasures.length" class="muted">背包里暂时没有法宝。</p>
@@ -558,11 +607,12 @@
 
                 <template v-else-if="tab === 'realm'">
                     <h3>渡劫突破</h3>
+                    <p class="desc">境界路线：{{ realmList.join(' → ') }}。每次突破消耗突破丹 ×1，失败也会消耗丹药；越往后天劫越凶险，失败率每个境界递增10%。成功后全属性提升50%，并恢复全部体力与灵力。</p>
                     <div class="grid" style="margin-top: 0.85rem">
                         <article class="card" v-for="role in save.party" :key="role.id">
                             <h3>{{ role.name }}</h3>
                             <p>{{ role.realm }}{{ role.realmLevel }}级 · 等级 {{ role.level }}</p>
-                            <p class="muted">筑基条件：等级 5，突破丹 ×1。突破后全属性提升。</p>
+                            <p class="muted">下一境界：{{ nextRealm(role) }}。条件：等级达到 {{ breakthroughLevel(role) }}，突破丹 ×1。当前失败率：{{ breakthroughFailRate(role) }}%。</p>
                             <button @click="breakthrough(role.id)">开始突破</button>
                         </article>
                     </div>
@@ -590,6 +640,15 @@
                 <template v-else-if="tab === 'codex'">
                     <h3>图鉴</h3>
                     <p class="muted">当前收集 {{ save.codex.length }} 项。</p>
+                    <div class="grid two" style="margin-top: 0.85rem">
+                        <article class="card" v-for="reward in codexRewards" :key="reward.id">
+                            <h3>收集 {{ reward.required }} 项</h3>
+                            <p class="muted">奖励：灵石 {{ reward.stones }}，五行精华 {{ reward.essence }}，突破丹 {{ reward.pills }}</p>
+                            <button @click="claimCodexReward(reward.id)" :disabled="reward.claimed || save.codex.length < reward.required">
+                                {{ reward.claimed ? '已领取' : '领取奖励' }}
+                            </button>
+                        </article>
+                    </div>
                     <div class="tabs" style="margin: 0.85rem 0">
                         <button v-for="group in codexGroups" :key="group.key" :class="{active: codexTab === group.key}" @click="codexTab = group.key">
                             {{ group.name }} {{ group.entries.length }}
@@ -617,9 +676,8 @@
                 <button @click="startAdventure" :disabled="!!battle && !battle.finished">地图探索</button>
                 <button @click="startTowerBattle" :disabled="!!battle && !battle.finished">锁妖塔</button>
                 <button @click="trialDialog = true" :disabled="!!battle && !battle.finished">五行洞</button>
-                <button disabled>万魔窟 v0.3</button>
-                <button disabled>仙灵洞 v0.3</button>
-                <button disabled>古战场 v0.2</button>
+                <button @click="openBossDialog('wanmo')" :disabled="!!battle && !battle.finished">万魔窟</button>
+                <button @click="openBossDialog('xianling')" :disabled="!!battle && !battle.finished">仙灵洞</button>
             </aside>
         </div>
 
@@ -635,6 +693,33 @@
                     <button @click="inn" :disabled="save.resources.spiritStones < innCost">确认恢复</button>
                     <button @click="innDialog = false">暂不恢复</button>
                 </div>
+            </section>
+        </div>
+
+        <div v-if="buyDialog" class="modal-mask" @click.self="closeBuyDialog">
+            <section class="modal">
+                <h3>确认购买</h3>
+                <p class="desc">{{ buyTarget.name }} · {{ buyTarget.quality }}</p>
+                <p class="muted">{{ buyTarget.description }}</p>
+                <label>
+                    购买数量
+                    <input type="number" min="1" max="99" v-model.number="buyQuantity">
+                </label>
+                <p>单价：{{ buyTarget.price }} 灵石</p>
+                <p><strong>总价：{{ buyTotal }} 灵石</strong></p>
+                <p class="muted">当前灵石：{{ save.resources.spiritStones }}</p>
+                <div class="row" style="margin-top: 1rem">
+                    <button @click="confirmBuy" :disabled="!buyCanAfford">确定购买</button>
+                    <button @click="closeBuyDialog">取消</button>
+                </div>
+            </section>
+        </div>
+
+        <div v-if="noticeDialog" class="modal-mask notice-mask" @click.self="noticeDialog = false">
+            <section class="modal">
+                <h3>{{ noticeTitle }}</h3>
+                <p class="desc">{{ noticeText }}</p>
+                <button style="margin-top: 1rem" @click="noticeDialog = false">确定</button>
             </section>
         </div>
 
@@ -691,6 +776,19 @@
                 <button style="margin-top: 1rem" @click="trialDialog = false">返回</button>
             </section>
         </div>
+
+        <div v-if="bossDialog" class="modal-mask" @click.self="bossDialog = false">
+            <section class="modal">
+                <h3>{{ selectedBoss === 'wanmo' ? '万魔窟 · 古魔' : '仙灵洞 · 灵界修士' }}</h3>
+                <p class="desc">世界 BOSS 为 3v1 高难度战斗。胜利后获得大量灵石、五行精华、经验和突破丹，并有概率掉落稀有法宝。</p>
+                <div class="grid two" style="margin-top: 1rem">
+                    <button v-for="difficulty in bossDifficulties" :key="difficulty.id" @click="startBoss(difficulty.id)">
+                        {{ difficulty.name }} · 推荐{{ difficulty.level }}级
+                    </button>
+                </div>
+                <button style="margin-top: 1rem" @click="bossDialog = false">返回</button>
+            </section>
+        </div>
     </main>
 </div>
 
@@ -713,6 +811,12 @@ createApp({
             pendingAction: null,
             battleActionMode: null,
             innDialog: false,
+            buyDialog: false,
+            selectedBuyId: null,
+            buyQuantity: 1,
+            noticeDialog: false,
+            noticeTitle: "",
+            noticeText: "",
             equipDialog: false,
             selectedEquipmentId: null,
             treasureDialog: false,
@@ -720,6 +824,8 @@ createApp({
             manualDialog: false,
             selectedManualId: null,
             trialDialog: false,
+            bossDialog: false,
+            selectedBoss: null,
             selectedCompanions: [],
             createForm: { name: "", gender: "男", element: "金" }
         };
@@ -730,6 +836,50 @@ createApp({
         },
         innCost() {
             return this.save ? this.save.party.length * 100 : 0;
+        },
+        realmList() {
+            return ["炼气期", "筑基期", "金丹期", "元婴期", "化神期", "炼虚期", "合体期", "大乘期", "渡劫期", "真仙期"];
+        },
+        ownedPillItems() {
+            return this.ownedItemsByCategory("pill");
+        },
+        ownedManualItems() {
+            return this.ownedItemsByCategory("manual");
+        },
+        shopPillItems() {
+            return (this.shop.items || []).filter(item => item.category === "pill" || item.category === "breakthrough");
+        },
+        shopManualItems() {
+            return (this.shop.items || []).filter(item => item.category === "manual");
+        },
+        buyTarget() {
+            return this.catalog.items[this.selectedBuyId]
+                || this.catalog.equipment[this.selectedBuyId]
+                || this.catalog.treasures[this.selectedBuyId]
+                || {};
+        },
+        buyTotal() {
+            return (this.buyTarget.price || 0) * Math.max(1, this.buyQuantity || 1);
+        },
+        buyCanAfford() {
+            return this.save && this.buyTotal > 0 && this.save.resources.spiritStones >= this.buyTotal;
+        },
+        bossDifficulties() {
+            return [
+                { id: "easy", name: "简单", level: 8 },
+                { id: "normal", name: "普通", level: 14 },
+                { id: "hard", name: "困难", level: 22 },
+                { id: "nightmare", name: "噩梦", level: 30 }
+            ];
+        },
+        codexRewards() {
+            const claimed = this.save?.codexRewardsClaimed || [];
+            return [
+                { id: "codex_10", required: 10, stones: 300, essence: 2, pills: 0 },
+                { id: "codex_25", required: 25, stones: 800, essence: 5, pills: 1 },
+                { id: "codex_50", required: 50, stones: 1800, essence: 10, pills: 2 },
+                { id: "codex_80", required: 80, stones: 3500, essence: 20, pills: 3 }
+            ].map(reward => ({ ...reward, claimed: claimed.includes(reward.id) }));
         },
         codexGroups() {
             const entries = this.save?.codex || [];
@@ -762,6 +912,13 @@ createApp({
         currentActor() {
             if (!this.battle?.save?.party) return null;
             return this.battle.save.party.find(role => role.id === this.battle.currentActorId) || null;
+        },
+        livingPartyCount() {
+            if (!this.battle?.save?.party) return 0;
+            return this.battle.save.party.filter(role => role.hp > 0).length;
+        },
+        plannedActionCount() {
+            return Object.keys(this.battle?.pendingActions || {}).length;
         },
         pendingTargets() {
             if (!this.pendingAction || !this.battle) return [];
@@ -893,6 +1050,22 @@ createApp({
                 this.message = error.message;
             }
         },
+        openBossDialog(bossId) {
+            this.selectedBoss = bossId;
+            this.bossDialog = true;
+        },
+        async startBoss(difficulty) {
+            try {
+                const bossId = this.selectedBoss;
+                this.bossDialog = false;
+                this.battle = await this.request(`/api/game/${this.save.id}/boss/${bossId}/${difficulty}`, { method: "POST" });
+                this.save = this.battle.save;
+                this.message = "世界BOSS出现，谨慎应战。";
+                this.tab = "home";
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
         async runBattle(url) {
             try {
                 this.battleResult = await this.request(url, { method: "POST" });
@@ -904,8 +1077,21 @@ createApp({
                 this.message = error.message;
             }
         },
-        async buy(itemId) {
-            await this.safeUpdate(`/api/game/${this.save.id}/shop/buy`, "购买成功。", { itemId, quantity: 1 });
+        openBuyDialog(itemId) {
+            this.selectedBuyId = itemId;
+            this.buyQuantity = 1;
+            this.buyDialog = true;
+        },
+        closeBuyDialog() {
+            this.buyDialog = false;
+            this.selectedBuyId = null;
+            this.buyQuantity = 1;
+        },
+        async confirmBuy() {
+            const itemId = this.selectedBuyId;
+            const quantity = Math.max(1, Math.min(99, this.buyQuantity || 1));
+            await this.safeUpdate(`/api/game/${this.save.id}/shop/buy`, `购买成功：${this.buyTarget.name} ×${quantity}。`, { itemId, quantity });
+            this.closeBuyDialog();
         },
         async usePill(characterId, itemId) {
             await this.safeUpdate(`/api/game/${this.save.id}/pill/use`, "丹药已使用。", { characterId, itemId });
@@ -917,6 +1103,9 @@ createApp({
         async unequipRole(characterId, slot) {
             await this.safeUpdate(`/api/game/${this.save.id}/equip/unequip`, "装备已卸下。", { characterId, slot });
         },
+        async decomposeEquipment(equipmentId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/equip/decompose`, `装备已分解，获得 ${this.decomposeValue(this.equipment(equipmentId).price)} 灵石。`, { equipmentId, quantity: 1 });
+        },
         async equipTreasure(characterId, treasureId) {
             await this.safeUpdate(`/api/game/${this.save.id}/treasure/equip`, "法宝已装备。", { characterId, treasureId });
             this.closeTreasureDialog();
@@ -924,13 +1113,32 @@ createApp({
         async unequipTreasure(characterId) {
             await this.safeUpdate(`/api/game/${this.save.id}/treasure/unequip`, "法宝已卸下。", { characterId });
         },
+        async decomposeTreasure(treasureId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/treasure/decompose`, `法宝已分解，获得 ${this.decomposeValue(this.treasure(treasureId).price)} 灵石。`, { treasureId, quantity: 1 });
+        },
         async learnManual(characterId, itemId) {
-            await this.safeUpdate(`/api/game/${this.save.id}/manual/learn`, "秘籍学习成功。", { characterId, itemId });
-            this.closeManualDialog();
+            const role = this.save.party.find(x => x.id === characterId);
+            try {
+                this.save = await this.request(`/api/game/${this.save.id}/manual/learn`, {
+                    method: "POST",
+                    body: JSON.stringify({ characterId, itemId })
+                });
+                this.message = "秘籍学习成功。";
+                this.showNotice("秘籍学习成功", `${role?.name || "角色"} 学会了 ${this.skillName(this.item(itemId).skillId)}。`);
+                this.closeManualDialog();
+                this.syncPartySelection();
+                await this.loadSaves();
+            } catch (error) {
+                this.showNotice("秘籍学习失败", error.message);
+                this.message = error.message;
+            }
         },
         async saveParty() {
             await this.safeUpdate(`/api/game/${this.save.id}/party`, "出战阵容已保存。", { companionIds: this.selectedCompanions });
             this.syncPartySelection();
+        },
+        async claimCodexReward(rewardId) {
+            await this.safeUpdate(`/api/game/${this.save.id}/codex/reward`, "图鉴奖励已领取。", { rewardId });
         },
         toggleCompanion(companionId) {
             if (this.selectedCompanions.includes(companionId)) {
@@ -944,7 +1152,22 @@ createApp({
             this.selectedCompanions.push(companionId);
         },
         async breakthrough(characterId) {
-            await this.safeUpdate(`/api/game/${this.save.id}/breakthrough`, "突破成功。", { characterId });
+            const role = this.save.party.find(x => x.id === characterId);
+            try {
+                this.save = await this.request(`/api/game/${this.save.id}/breakthrough`, {
+                    method: "POST",
+                    body: JSON.stringify({ characterId })
+                });
+                const updated = this.save.party.find(x => x.id === characterId);
+                this.message = "突破成功。";
+                this.showNotice("渡劫成功", `${updated?.name || role?.name || "角色"} 成功突破到 ${updated?.realm || ""}。`);
+                this.syncPartySelection();
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+                this.showNotice("渡劫失败", error.message);
+                await this.reloadCurrentSave();
+            }
         },
         async safeUpdate(url, success, body = null) {
             try {
@@ -959,6 +1182,42 @@ createApp({
             } catch (error) {
                 this.message = error.message;
             }
+        },
+        async reloadCurrentSave() {
+            if (!this.save?.id) return;
+            try {
+                this.save = await this.request(`/api/game/${this.save.id}`);
+                this.syncPartySelection();
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+            }
+        },
+        showNotice(title, text) {
+            this.noticeTitle = title;
+            this.noticeText = text;
+            this.noticeDialog = true;
+        },
+        ownedItemsByCategory(category) {
+            return Object.entries(this.save?.inventory || {})
+                .map(([id, count]) => ({ id, count }))
+                .filter(entry => this.item(entry.id).category === category);
+        },
+        realmIndex(role) {
+            const index = this.realmList.indexOf(role?.realm);
+            return index < 0 ? 0 : index;
+        },
+        nextRealm(role) {
+            const index = this.realmIndex(role);
+            return this.realmList[index + 1] || "已达最高境界";
+        },
+        breakthroughLevel(role) {
+            const index = this.realmIndex(role);
+            return this.realmList[index + 1] ? (index + 1) * 5 : "-";
+        },
+        breakthroughFailRate(role) {
+            const index = this.realmIndex(role);
+            return this.realmList[index + 1] ? Math.min(90, (index + 1) * 10) : 0;
         },
         percent(value, max) {
             return max ? Math.max(0, Math.min(100, Math.round(value * 100 / max))) : 0;
@@ -1043,6 +1302,9 @@ createApp({
             if (type === "magical") return "法术";
             return "特殊";
         },
+        decomposeValue(price) {
+            return Math.max(1, Math.floor((price || 0) / 2));
+        },
         setPendingAttack() {
             this.pendingAction = { action: "attack", targetType: "enemy" };
             this.battleActionMode = null;
@@ -1082,7 +1344,7 @@ createApp({
                 this.save = this.battle.save;
                 this.pendingAction = null;
                 this.battleActionMode = null;
-                this.message = this.battle.finished ? "战斗结束，已自动保存。" : "轮到你行动。";
+                this.message = this.battle.finished ? "战斗结束，已自动保存。" : "继续选择本回合行动。";
                 await this.loadSaves();
             } catch (error) {
                 this.message = error.message;

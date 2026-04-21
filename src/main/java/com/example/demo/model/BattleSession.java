@@ -22,6 +22,7 @@ public class BattleSession {
     public boolean escaped;
     public String postBattleEvent;
     public Map<String, Boolean> usedTreasures = new HashMap<>();
+    public Map<String, BattleActionRequest> pendingActions = new HashMap<>();
     public int spiritStones;
     public int essence;
     public int exp;
