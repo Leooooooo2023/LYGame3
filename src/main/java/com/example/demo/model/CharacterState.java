@@ -10,6 +10,7 @@ public class CharacterState {
     public String name;
     public String gender;
     public String element;
+    public String avatar;
     public boolean companion;
     public boolean unlocked = true;
     public int level = 1;

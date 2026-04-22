@@ -57,6 +57,16 @@ public class GameService {
         return save;
     }
 
+    public List<GameSave> deleteSave(String id) {
+        GameSave removed = saves.remove(id);
+        if (removed == null) {
+            throw new IllegalArgumentException("存档不存在");
+        }
+        battles.entrySet().removeIf(entry -> id.equals(entry.getValue().saveId));
+        saveToDisk();
+        return listSaves();
+    }
+
     public GameSave createGame(String name, String gender, String element) {
         String trimmed = name == null ? "" : name.trim();
         if (trimmed.isEmpty() || trimmed.length() > 8) {
@@ -1105,6 +1115,7 @@ public class GameService {
             enemy.name = names.get((difficulty + i) % names.size());
             enemy.gender = "未知";
             enemy.element = element;
+            enemy.avatar = enemyAvatar(enemy.name);
             enemy.level = difficulty;
             enemy.maxHp = 70 + difficulty * 22;
             enemy.hp = enemy.maxHp;
@@ -1131,6 +1142,7 @@ public class GameService {
         boss.name = wanmo ? "古魔" : "灵界修士";
         boss.gender = "未知";
         boss.element = wanmo ? "火" : "水";
+        boss.avatar = wanmo ? "boss_wanmo.png" : "boss_xianling.png";
         boss.level = difficulty + 5;
         boss.maxHp = 260 + difficulty * 55;
         boss.hp = boss.maxHp;
@@ -1150,6 +1162,7 @@ public class GameService {
         player.name = name;
         player.gender = gender;
         player.element = element;
+        player.avatar = playerAvatar(gender);
         player.skills.addAll(Catalog.initialSkills(element));
         return player;
     }
@@ -1159,7 +1172,7 @@ public class GameService {
         addMissingCompanion(save, "companion_chenqiaoqian", "陈巧倩", "女", "木");
         addMissingCompanion(save, "companion_yuanyao", "元瑶", "女", "水");
         addMissingCompanion(save, "companion_ziling", "紫灵", "女", "火");
-        addMissingCompanion(save, "companion_xinruyin", "辛如音", "女", "土");
+        addMissingCompanion(save, "companion_mupeiling", "慕沛灵", "女", "土");
         addMissingCompanion(save, "companion_lifeiyu", "厉飞雨", "男", "金");
         addMissingCompanion(save, "companion_qiyunxiao", "齐云霄", "男", "木");
         addMissingCompanion(save, "companion_mojiao", "墨蛟", "男", "水");
@@ -1180,6 +1193,7 @@ public class GameService {
         companion.name = name;
         companion.gender = gender;
         companion.element = element;
+        companion.avatar = id + ".png";
         companion.companion = true;
         companion.unlocked = unlocked;
         companion.maxHp = 90;
@@ -1192,6 +1206,17 @@ public class GameService {
         companion.agility = 11;
         companion.skills.addAll(Catalog.initialSkills(element));
         return companion;
+    }
+
+    private String enemyAvatar(String name) {
+        return switch (name) {
+            case "黑风寨匪徒" -> "enemy_bandit.png";
+            case "银月妖狼" -> "enemy_wolf.png";
+            case "鬼灵门邪修" -> "enemy_cultivator.png";
+            case "赤炎虎王" -> "enemy_tiger.png";
+            case "石巨人" -> "enemy_stone_giant.png";
+            default -> "enemy_default.png";
+        };
     }
 
     private void gainExp(CharacterState character, int exp, List<String> logs) {
@@ -1305,6 +1330,9 @@ public class GameService {
         if (save.codexRewardsClaimed == null) {
             save.codexRewardsClaimed = new ArrayList<>();
         }
+        migrateLegacyCharacters(save.party);
+        migrateLegacyCharacters(save.companions);
+        dedupeCompanions(save);
         seedCompanions(save);
         for (CharacterState character : save.party) {
             normalizeCharacter(character);
@@ -1314,7 +1342,72 @@ public class GameService {
         }
     }
 
+    private void migrateLegacyCharacters(List<CharacterState> characters) {
+        for (CharacterState character : characters) {
+            migrateLegacyCharacter(character);
+        }
+    }
+
+    private void migrateLegacyCharacter(CharacterState character) {
+        if (character == null) {
+            return;
+        }
+        if ("companion_xinruyin".equals(character.id) || "辛如音".equals(character.name)) {
+            character.id = "companion_mupeiling";
+            character.name = "慕沛灵";
+            character.gender = "女";
+            character.element = "土";
+            character.avatar = "companion_mupeiling.png";
+        }
+    }
+
+    private void dedupeCompanions(GameSave save) {
+        Map<String, CharacterState> byId = new LinkedHashMap<>();
+        for (CharacterState companion : save.companions) {
+            if (companion == null || companion.id == null) {
+                continue;
+            }
+            CharacterState existing = byId.get(companion.id);
+            if (existing == null) {
+                byId.put(companion.id, companion);
+                continue;
+            }
+            CharacterState keeper = betterProgress(existing, companion) ? existing : companion;
+            CharacterState other = keeper == existing ? companion : existing;
+            mergeCompanionProgress(keeper, other);
+            byId.put(keeper.id, keeper);
+        }
+        save.companions = new ArrayList<>(byId.values());
+    }
+
+    private boolean betterProgress(CharacterState left, CharacterState right) {
+        int leftScore = left.level * 1000 + left.affection * 10 + left.exp + (left.unlocked ? 100000 : 0);
+        int rightScore = right.level * 1000 + right.affection * 10 + right.exp + (right.unlocked ? 100000 : 0);
+        return leftScore >= rightScore;
+    }
+
+    private void mergeCompanionProgress(CharacterState keeper, CharacterState other) {
+        keeper.unlocked = keeper.unlocked || other.unlocked;
+        keeper.affection = Math.max(keeper.affection, other.affection);
+        keeper.exp = Math.max(keeper.exp, other.exp);
+        if (keeper.skills == null || keeper.skills.isEmpty()) {
+            keeper.skills = other.skills;
+        }
+        if (keeper.equipment == null || keeper.equipment.isEmpty()) {
+            keeper.equipment = other.equipment;
+        }
+        if (keeper.treasure == null || keeper.treasure.isBlank()) {
+            keeper.treasure = other.treasure;
+        }
+    }
+
     private void normalizeCharacter(CharacterState character) {
+        migrateLegacyCharacter(character);
+        if ("player".equals(character.id) && isLegacyPlayerAvatar(character.avatar)) {
+            character.avatar = playerAvatar(character.gender);
+        } else if (character.avatar == null || character.avatar.isBlank()) {
+            character.avatar = defaultAvatar(character);
+        }
         if (character.skills == null) {
             character.skills = new ArrayList<>();
         }
@@ -1324,6 +1417,33 @@ public class GameService {
         if (character.statuses == null) {
             character.statuses = new java.util.HashMap<>();
         }
+    }
+
+    private String defaultAvatar(CharacterState character) {
+        if ("player".equals(character.id)) {
+            return playerAvatar(character.gender);
+        }
+        if (character.id != null && character.id.startsWith("companion_")) {
+            return character.id + ".png";
+        }
+        if (character.id != null && character.id.startsWith("boss_wanmo")) {
+            return "boss_wanmo.png";
+        }
+        if (character.id != null && character.id.startsWith("boss_xianling")) {
+            return "boss_xianling.png";
+        }
+        if (character.name != null) {
+            return enemyAvatar(character.name);
+        }
+        return "default.png";
+    }
+
+    private boolean isLegacyPlayerAvatar(String avatar) {
+        return avatar == null || avatar.isBlank() || "player.png".equals(avatar);
+    }
+
+    private String playerAvatar(String gender) {
+        return "女".equals(gender) ? "player_female.png" : "player_male.png";
     }
 
     private boolean alive(CharacterState character) {

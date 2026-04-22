@@ -8,6 +8,7 @@ import com.example.demo.model.GameSave;
 import com.example.demo.model.PartyRequest;
 import com.example.demo.model.SimpleRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,6 +43,11 @@ public class GameController {
     @GetMapping("/{id}")
     public GameSave save(@PathVariable String id) {
         return gameService.getSave(id);
+    }
+
+    @DeleteMapping("/{id}")
+    public List<GameSave> deleteSave(@PathVariable String id) {
+        return gameService.deleteSave(id);
     }
 
     @GetMapping("/shop")

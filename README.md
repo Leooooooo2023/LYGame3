@@ -1,6 +1,6 @@
 # 凡人修仙外传
 
-网页端单机修仙回合制 RPG。当前版本为 v0.3，聚焦世界BOSS、图鉴奖励、装备法宝分解和战斗体验扩展。
+网页端单机修仙回合制 RPG。当前版本为 v0.4，聚焦角色头像、背景音乐、存档删除和体验完善。
 
 ## 技术栈
 
@@ -159,12 +159,35 @@ src/main/resources/static/index.html
 Vue 单页游戏前端。
 
 ```text
+src/main/resources/static/assets/avatars
+```
+
+角色、道友、敌人和世界 BOSS 头像目录。图片文件名请使用英文，具体命名见该目录下的 `README.md`。
+
+```text
+src/main/resources/static/assets/audio
+```
+
+背景音乐目录。主菜单和游戏主界面使用 `main_bgm.mp3`。
+
+```text
 src/main/resources/application.properties
 ```
 
 应用配置，默认端口 `8080`。
 
 ## 版本更新
+
+### v0.4
+
+- 新增角色、道友、敌人和世界 BOSS 头像显示。
+- 男主角和女主角使用不同头像文件。
+- 女道友“辛如音”调整为“慕沛灵”，并兼容旧存档自动迁移。
+- 新增头像资源目录说明，文件名均使用英文并附中文对应注解。
+- 主菜单版本号更新为 v0.4。
+- 新增背景音乐，主菜单和游戏主界面右上角可开启/关闭。
+- 新增音频资源目录说明，背景音乐文件名为 `main_bgm.mp3`。
+- 读取进度界面新增删除存档功能，删除前会弹窗确认。
 
 ### v0.3
 
@@ -218,7 +241,7 @@ src/main/resources/application.properties
 
 ## 后续计划
 
-### v0.4 计划
+### v0.5 计划
 
 - MySQL 存档与账号系统
 - 世界 BOSS 每日挑战次数
