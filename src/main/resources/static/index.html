@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>凡人修仙外传 v0.6</title>
+    <title>凡人修仙外传 v0.61</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -298,7 +298,7 @@
     <main v-if="screen === 'menu'" class="menu main-menu">
         <button class="music-toggle" @click="toggleMusic">{{ musicLabel }}</button>
         <section class="title-block">
-            <p class="subtitle">v0.6 网页端单机修仙回合制</p>
+            <p class="subtitle">v0.61 网页端单机修仙回合制</p>
             <p v-if="message" class="message">{{ message }}</p>
             <div class="stack">
                 <button @click="screen = 'create'">新的旅程</button>
@@ -382,7 +382,7 @@
     <main v-else-if="screen === 'about'" class="menu main-menu">
         <section class="title-block">
             <h2>关于游戏</h2>
-            <p class="subtitle">开发者：李涌 · 版本：v0.6 · 发布目标：五行转换、双修养成、图鉴扩展、锁妖塔扩展</p>
+            <p class="subtitle">开发者：李涌 · 版本：v0.61 · 发布目标：战斗说明优化、角色属性展示、头像恢复</p>
             <div class="stack">
                 <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、秘籍学习、法宝使用、五行试炼、境界突破。</p>
                 <button @click="screen = 'menu'">返回</button>
@@ -485,6 +485,9 @@
                                 <button @click="setPendingTreasure" :disabled="!currentActor?.treasure || battle.usedTreasures?.[currentActor.id]">法宝</button>
                                 <button @click="submitBattleAction({action: 'escape'})">逃跑</button>
                             </div>
+                            <p v-if="currentActor?.treasure" class="muted" style="margin-top: 0.55rem">
+                                当前法宝：{{ treasureName(currentActor.treasure) }} · {{ treasureBattleDescription(currentActor.treasure) }}
+                            </p>
 
                             <div v-if="battleActionMode === 'skills'" class="grid two" style="margin-top: 1rem">
                                 <button class="target-button" v-for="skillId in currentActor?.skills || []" :key="skillId" @click="setPendingSkill(skillId)" :disabled="currentActor && currentActor.mp < skill(skillId).mpCost">
@@ -505,7 +508,7 @@
 
                             <div v-if="pendingAction" style="margin-top: 1rem">
                                 <h3>选择目标</h3>
-                                <p v-if="pendingAction.action === 'treasure'" class="muted">{{ treasureName(currentActor.treasure) }}：{{ treasure(currentActor.treasure).description }}</p>
+                                <p v-if="pendingAction.action === 'treasure'" class="muted">{{ treasureName(currentActor.treasure) }}：{{ treasureBattleDescription(currentActor.treasure) }}。{{ treasure(currentActor.treasure).description }}</p>
                                 <div class="grid two" style="margin-top: 0.65rem">
                                     <button class="target-button" v-for="target in pendingTargets" :key="target.id" @click="submitBattleTarget(target.id)" :disabled="target.hp <= 0 && !canTargetDead(pendingAction)">
                                         {{ target.name }} · 体力 {{ target.hp }}/{{ target.maxHp }} · 灵力 {{ target.mp }}/{{ target.maxMp }}
@@ -542,7 +545,7 @@
                                 <img :key="avatarUrl(role)" :src="avatarUrl(role)" :alt="role.name" @error="hideBrokenAvatar">
                             </div>
                             <h3>{{ role.name }}</h3>
-                            <div class="muted">{{ role.realm }} · 等级 {{ role.level }}</div>
+                            <div class="muted">{{ role.realm }} · 等级 {{ role.level }} · {{ role.element }}属性</div>
                             <div class="meter"><span :style="{width: percent(role.exp, role.nextExp) + '%'}"></span></div>
                             <div>经验 {{ role.exp }}/{{ role.nextExp }}</div>
                             <div class="meter"><span :style="{width: percent(role.hp, role.maxHp) + '%'}"></span></div>
@@ -1728,17 +1731,45 @@ createApp({
         treasureEffect(id) {
             const treasure = this.treasure(id);
             if (!treasure.name) return "";
+            return `${this.treasureScopeText(id)} · 消耗${treasure.mpCost}灵力 · 每场每名角色1次`;
+        },
+        treasureBattleDescription(id) {
+            const treasure = this.treasure(id);
+            if (!treasure.name) return "";
+            const details = [this.treasureScopeText(id), `消耗${treasure.mpCost}灵力`, this.treasureEffectDetail(treasure)];
+            return details.filter(Boolean).join(" · ");
+        },
+        treasureScopeText(id) {
+            const treasure = this.treasure(id);
+            if (!treasure.name) return "";
+            const groupEffects = new Set(["all_heal", "all_mp", "all_heal_mp", "all_stun", "all_buff_allies"]);
+            const scope = groupEffects.has(treasure.effectType) ? "群体" : "单体";
             const target = treasure.targetType === "ally" ? "我方" : "敌方";
-            return `${target}目标 · 消耗${treasure.mpCost}灵力 · 每场每名角色1次`;
+            return `${scope}${target}目标`;
+        },
+        treasureEffectDetail(treasure) {
+            if (treasure.effectType === "heal") return `恢复${treasure.power}%体力`;
+            if (treasure.effectType === "mp") return `恢复${treasure.power}%灵力`;
+            if (treasure.effectType === "heal_mp") return `恢复${treasure.power}%体力和灵力`;
+            if (treasure.effectType === "revive") return `复活或恢复${treasure.power}%体力`;
+            if (treasure.effectType === "stun") return `眩晕${treasure.power}回合`;
+            if (treasure.effectType === "shield") return `护盾${treasure.power}回合`;
+            if (treasure.effectType === "drain_hp") return `威力${treasure.power}%并吸血`;
+            if (treasure.effectType.endsWith("_buff")) return `增益${treasure.power}回合`;
+            if (treasure.effectType === "cleanse") return "驱散异常状态";
+            return treasure.description;
         },
         skillDescription(id) {
             const skill = this.skill(id);
             if (!skill.name) return "";
+            const scope = skill.targetType === "all_enemy" ? "群体敌方目标"
+                : skill.targetType === "all_ally" ? "群体我方目标"
+                : skill.type === "heal" ? "单体我方目标"
+                : "单体敌方目标";
             if (skill.type === "heal") {
-                return `治疗技能，恢复${skill.power}%体力，消耗${skill.mpCost}灵力`;
+                return `${scope}，治疗技能，恢复${skill.power}%体力，消耗${skill.mpCost}灵力`;
             }
-            const parts = [`${this.damageTypeName(skill.type)}伤害`, `威力${skill.power}%`];
-            if (skill.mpCost) parts.push(`消耗${skill.mpCost}灵力`);
+            const parts = [scope, `${this.damageTypeName(skill.type)}伤害`, `威力${skill.power}%`, `消耗${skill.mpCost || 0}灵力`];
             if (skill.status) parts.push(`附加${skill.status}${skill.statusTurns}回合`);
             return parts.join("，");
         },
