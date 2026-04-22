@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>凡人修仙外传 v0.61</title>
+    <title>凡人修仙外传 v0.62</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -298,7 +298,7 @@
     <main v-if="screen === 'menu'" class="menu main-menu">
         <button class="music-toggle" @click="toggleMusic">{{ musicLabel }}</button>
         <section class="title-block">
-            <p class="subtitle">v0.61 网页端单机修仙回合制</p>
+            <p class="subtitle">v0.62 网页端单机修仙回合制</p>
             <p v-if="message" class="message">{{ message }}</p>
             <div class="stack">
                 <button @click="screen = 'create'">新的旅程</button>
@@ -382,7 +382,7 @@
     <main v-else-if="screen === 'about'" class="menu main-menu">
         <section class="title-block">
             <h2>关于游戏</h2>
-            <p class="subtitle">开发者：李涌 · 版本：v0.61 · 发布目标：战斗说明优化、角色属性展示、头像恢复</p>
+            <p class="subtitle">开发者：李涌 · 版本：v0.62 · 发布目标：道友进度同步、阵容切换稳定性</p>
             <div class="stack">
                 <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、秘籍学习、法宝使用、五行试炼、境界突破。</p>
                 <button @click="screen = 'menu'">返回</button>

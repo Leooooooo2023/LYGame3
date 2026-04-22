@@ -342,6 +342,7 @@ public class GameService {
 
     public GameSave updateParty(String saveId, PartyRequest request) {
         GameSave save = getSave(saveId);
+        syncCompanionProgress(save);
         CharacterState player = save.party.stream()
                 .filter(c -> !c.companion)
                 .findFirst()
@@ -364,6 +365,7 @@ public class GameService {
             }
         }
         save.party = newParty;
+        syncCompanionProgress(save);
         persist(save);
         return save;
     }
@@ -915,6 +917,7 @@ public class GameService {
                 character.affection += 1;
             }
         }
+        syncCompanionProgress(save);
         if (random.nextInt(100) < 35) {
             addCount(save.inventory, "heqi_pill", 1);
             battle.drops.add("合气丹 ×1");
@@ -1227,6 +1230,7 @@ public class GameService {
                     character.affection += 1;
                 }
             }
+            syncCompanionProgress(save);
             if (random.nextInt(100) < 35) {
                 addCount(save.inventory, "heqi_pill", 1);
                 result.drops.add("合气丹 ×1");
@@ -1705,6 +1709,7 @@ public class GameService {
         migrateLegacyCharacters(save.companions);
         dedupeCompanions(save);
         seedCompanions(save);
+        syncCompanionProgress(save);
         for (CharacterState character : save.party) {
             normalizeCharacter(character);
         }
@@ -1751,6 +1756,54 @@ public class GameService {
         save.companions = new ArrayList<>(byId.values());
     }
 
+    private void syncCompanionProgress(GameSave save) {
+        if (save.party == null) {
+            save.party = new ArrayList<>();
+        }
+        if (save.companions == null) {
+            save.companions = new ArrayList<>();
+        }
+        Map<String, CharacterState> byId = new LinkedHashMap<>();
+        for (CharacterState companion : save.companions) {
+            if (companion == null || companion.id == null) {
+                continue;
+            }
+            CharacterState existing = byId.get(companion.id);
+            if (existing == null) {
+                byId.put(companion.id, companion);
+            } else {
+                CharacterState keeper = betterProgress(existing, companion) ? existing : companion;
+                CharacterState other = keeper == existing ? companion : existing;
+                mergeCompanionProgress(keeper, other);
+                byId.put(keeper.id, keeper);
+            }
+        }
+        for (CharacterState partyMember : save.party) {
+            if (partyMember == null || !partyMember.companion || partyMember.id == null) {
+                continue;
+            }
+            CharacterState companion = byId.get(partyMember.id);
+            if (companion == null) {
+                byId.put(partyMember.id, partyMember);
+                continue;
+            }
+            CharacterState keeper = betterProgress(companion, partyMember) ? companion : partyMember;
+            CharacterState other = keeper == companion ? partyMember : companion;
+            mergeCompanionProgress(keeper, other);
+            byId.put(keeper.id, keeper);
+        }
+        save.companions = new ArrayList<>(byId.values());
+        for (int i = 0; i < save.party.size(); i++) {
+            CharacterState partyMember = save.party.get(i);
+            if (partyMember != null && partyMember.companion && partyMember.id != null) {
+                CharacterState synced = byId.get(partyMember.id);
+                if (synced != null) {
+                    save.party.set(i, synced);
+                }
+            }
+        }
+    }
+
     private boolean betterProgress(CharacterState left, CharacterState right) {
         int leftScore = left.level * 1000 + left.affection * 10 + left.exp + (left.unlocked ? 100000 : 0);
         int rightScore = right.level * 1000 + right.affection * 10 + right.exp + (right.unlocked ? 100000 : 0);
@@ -1758,14 +1811,81 @@ public class GameService {
     }
 
     private void mergeCompanionProgress(CharacterState keeper, CharacterState other) {
+        if (other == null) {
+            return;
+        }
+        boolean otherHasHigherLevel = other.level > keeper.level || (other.level == keeper.level && other.exp > keeper.exp);
+        if (otherHasHigherLevel) {
+            keeper.level = other.level;
+            keeper.exp = other.exp;
+            keeper.nextExp = other.nextExp;
+            keeper.realm = other.realm;
+            keeper.realmLevel = other.realmLevel;
+            keeper.maxHp = other.maxHp;
+            keeper.hp = other.hp;
+            keeper.maxMp = other.maxMp;
+            keeper.mp = other.mp;
+            keeper.attack = other.attack;
+            keeper.magic = other.magic;
+            keeper.defense = other.defense;
+            keeper.agility = other.agility;
+        } else {
+            keeper.exp = Math.max(keeper.exp, other.exp);
+            keeper.nextExp = Math.max(keeper.nextExp, other.nextExp);
+            keeper.maxHp = Math.max(keeper.maxHp, other.maxHp);
+            keeper.hp = Math.max(keeper.hp, other.hp);
+            keeper.maxMp = Math.max(keeper.maxMp, other.maxMp);
+            keeper.mp = Math.max(keeper.mp, other.mp);
+            keeper.attack = Math.max(keeper.attack, other.attack);
+            keeper.magic = Math.max(keeper.magic, other.magic);
+            keeper.defense = Math.max(keeper.defense, other.defense);
+            keeper.agility = Math.max(keeper.agility, other.agility);
+        }
         keeper.unlocked = keeper.unlocked || other.unlocked;
         keeper.affection = Math.max(keeper.affection, other.affection);
-        keeper.exp = Math.max(keeper.exp, other.exp);
-        if (keeper.skills == null || keeper.skills.isEmpty()) {
-            keeper.skills = other.skills;
+        if (keeper.skills == null) {
+            keeper.skills = new ArrayList<>();
         }
-        if (keeper.equipment == null || keeper.equipment.isEmpty()) {
-            keeper.equipment = other.equipment;
+        if (other.skills != null) {
+            for (String skill : other.skills) {
+                if (!keeper.skills.contains(skill)) {
+                    keeper.skills.add(skill);
+                }
+            }
+        }
+        if (keeper.unlockedElements == null) {
+            keeper.unlockedElements = new ArrayList<>();
+        }
+        if (other.unlockedElements != null) {
+            for (String element : other.unlockedElements) {
+                if (!keeper.unlockedElements.contains(element)) {
+                    keeper.unlockedElements.add(element);
+                }
+            }
+        }
+        if (keeper.elementSkills == null) {
+            keeper.elementSkills = new LinkedHashMap<>();
+        }
+        if (other.elementSkills != null) {
+            for (Map.Entry<String, List<String>> entry : other.elementSkills.entrySet()) {
+                if (entry.getValue() == null) {
+                    continue;
+                }
+                List<String> remembered = keeper.elementSkills.computeIfAbsent(entry.getKey(), key -> new ArrayList<>());
+                for (String skill : entry.getValue()) {
+                    if (!remembered.contains(skill)) {
+                        remembered.add(skill);
+                    }
+                }
+            }
+        }
+        if (keeper.equipment == null) {
+            keeper.equipment = new java.util.HashMap<>();
+        }
+        if (other.equipment != null) {
+            for (Map.Entry<String, String> entry : other.equipment.entrySet()) {
+                keeper.equipment.putIfAbsent(entry.getKey(), entry.getValue());
+            }
         }
         if (keeper.treasure == null || keeper.treasure.isBlank()) {
             keeper.treasure = other.treasure;
@@ -1850,6 +1970,7 @@ public class GameService {
     }
 
     private void persist(GameSave save) {
+        syncCompanionProgress(save);
         save.updatedAt = now();
         saveToDisk();
     }
