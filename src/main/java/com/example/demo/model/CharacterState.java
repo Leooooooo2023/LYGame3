@@ -29,6 +29,8 @@ public class CharacterState {
     public int affection = 0;
     public String treasure;
     public List<String> skills = new ArrayList<>();
+    public List<String> unlockedElements = new ArrayList<>();
+    public Map<String, List<String>> elementSkills = new HashMap<>();
     public Map<String, String> equipment = new HashMap<>();
     public Map<String, Integer> statuses = new HashMap<>();
 }

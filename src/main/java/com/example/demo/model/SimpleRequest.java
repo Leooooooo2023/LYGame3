@@ -7,6 +7,7 @@ public class SimpleRequest {
     public String treasureId;
     public String rewardId;
     public String regionId;
+    public String element;
     public String slot;
     public int quantity = 1;
 }

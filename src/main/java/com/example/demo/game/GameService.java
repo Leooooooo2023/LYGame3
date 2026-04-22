@@ -333,6 +333,7 @@ public class GameService {
             throw new IllegalArgumentException("角色已经掌握该技能");
         }
         character.skills.add(skill.id);
+        rememberElementSkill(character, skill.element, skill.id);
         addCount(save.inventory, itemId, -1);
         addCodex(save, skill.name);
         persist(save);
@@ -387,6 +388,36 @@ public class GameService {
         return save;
     }
 
+    public GameSave dualCultivation(String saveId, String companionId) {
+        GameSave save = getSave(saveId);
+        CharacterState player = player(save);
+        CharacterState companion = save.companions.stream()
+                .filter(c -> c.id.equals(companionId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("道友不存在"));
+        if (!companion.unlocked) {
+            throw new IllegalArgumentException("该道友尚未结识，无法双修");
+        }
+        if (player.gender == null || companion.gender == null || player.gender.equals(companion.gender)) {
+            throw new IllegalArgumentException("只能与主角性别不同的已获得道友双修");
+        }
+        if (companion.affection >= 100) {
+            throw new IllegalArgumentException("该道友好感度已经达到上限");
+        }
+        int required = 10;
+        if (save.inventory.getOrDefault("creation_pill", 0) < required) {
+            throw new IllegalArgumentException("双修需要造化丹 ×10");
+        }
+        addCount(save.inventory, "creation_pill", -required);
+        companion.affection = Math.min(100, companion.affection + 20);
+        save.party.stream()
+                .filter(c -> c.id.equals(companion.id))
+                .findFirst()
+                .ifPresent(c -> c.affection = companion.affection);
+        persist(save);
+        return save;
+    }
+
     public GameSave breakthrough(String saveId, String characterId) {
         GameSave save = getSave(saveId);
         CharacterState character = findCharacter(save, characterId);
@@ -400,28 +431,68 @@ public class GameService {
         String nextRealm = REALMS.get(currentRealmIndex + 1);
         int requiredLevel = (currentRealmIndex + 1) * 5;
         int failureRate = breakthroughFailureRate(character);
+        int requiredPills = breakthroughPillCost(character);
         if (character.level < requiredLevel) {
             throw new IllegalArgumentException("角色达到 " + requiredLevel + " 级后才能突破到" + nextRealm);
         }
-        if (save.resources.breakthroughPill <= 0) {
-            throw new IllegalArgumentException("需要突破丹 ×1");
+        if (save.resources.breakthroughPill < requiredPills) {
+            throw new IllegalArgumentException("需要突破丹 ×" + requiredPills);
         }
-        save.resources.breakthroughPill -= 1;
+        save.resources.breakthroughPill -= requiredPills;
         if (random.nextInt(100) < failureRate) {
             persist(save);
-            throw new IllegalStateException(character.name + " 渡劫失败，消耗突破丹 ×1。当前境界失败率为 " + failureRate + "%，请提升等级和资源后再试。");
+            throw new IllegalStateException(character.name + " 渡劫失败，消耗突破丹 ×" + requiredPills + "。当前境界失败率为 " + failureRate + "%，请提升等级和资源后再试。");
         }
         character.realm = nextRealm;
         character.realmLevel = 1;
-        character.maxHp = character.maxHp * 3 / 2;
-        character.maxMp = character.maxMp * 3 / 2;
-        character.attack = character.attack * 3 / 2;
-        character.magic = character.magic * 3 / 2;
-        character.defense = character.defense * 3 / 2;
-        character.agility = character.agility * 3 / 2;
+        character.maxHp = character.maxHp * 5 / 4;
+        character.maxMp = character.maxMp * 5 / 4;
+        character.attack = character.attack * 5 / 4;
+        character.magic = character.magic * 5 / 4;
+        character.defense = character.defense * 5 / 4;
+        character.agility = character.agility * 5 / 4;
         character.hp = character.maxHp;
         character.mp = character.maxMp;
         addCodex(save, nextRealm);
+        persist(save);
+        return save;
+    }
+
+    public GameSave convertPlayerElement(String saveId, String element) {
+        GameSave save = getSave(saveId);
+        if (!Catalog.ELEMENTS.contains(element)) {
+            throw new IllegalArgumentException("五行属性不存在");
+        }
+        CharacterState player = player(save);
+        ensurePlayerElementMemory(player);
+        if (element.equals(player.element)) {
+            return save;
+        }
+        if (!player.unlockedElements.contains(element)) {
+            int unlockedLimit = unlockedElementLimit(player);
+            if (player.unlockedElements.size() >= unlockedLimit) {
+                throw new IllegalArgumentException("当前等级最多解锁 " + unlockedLimit + " 种五行属性。主角从10级开始，每升10级可多解锁一种。");
+            }
+            if (save.resources.fiveElementEssence < 100) {
+                throw new IllegalArgumentException("解锁新五行属性需要五行精华 ×100");
+            }
+            save.resources.fiveElementEssence -= 100;
+            player.unlockedElements.add(element);
+            player.elementSkills.put(element, new ArrayList<>(Catalog.initialSkills(element)));
+        }
+        rememberCurrentElementSkills(player);
+        List<String> remembered = player.elementSkills.get(element);
+        if (remembered == null || remembered.isEmpty()) {
+            remembered = new ArrayList<>(Catalog.initialSkills(element));
+        }
+        player.element = element;
+        player.skills = new ArrayList<>(remembered);
+        for (String skillId : player.skills) {
+            SkillDef skill = Catalog.SKILLS.get(skillId);
+            if (skill != null) {
+                addCodex(save, skill.name);
+            }
+        }
         persist(save);
         return save;
     }
@@ -448,7 +519,7 @@ public class GameService {
                 if (save.party.size() < 3) {
                     save.party.add(companion);
                 }
-                addCodex(save, companion.name);
+                addCompanionCodex(save, companion);
                 result.put("message", "山道偶遇道友 " + companion.name + "，对方决定与你同行。");
             } else {
                 save.resources.breakthroughPill += 1;
@@ -463,15 +534,15 @@ public class GameService {
     public BattleSession startAdventure(String saveId, String regionId) {
         GameSave save = getSave(saveId);
         AdventureRegion region = adventureRegion(regionId);
-        if (mainLevel(save) < region.minLevel()) {
-            throw new IllegalArgumentException(region.name() + " 推荐 " + region.minLevel() + " 级后再探索");
-        }
         int difficulty = region.minLevel();
         return startBattle(save, region.name() + "探索", "adventure_" + region.id(), difficulty, false);
     }
 
     public BattleSession startTowerBattle(String saveId) {
         GameSave save = getSave(saveId);
+        if (save.towerFloor > 50) {
+            throw new IllegalStateException("锁妖塔50层已经全部通关");
+        }
         return startBattle(save, "锁妖塔第 " + save.towerFloor + " 层", "tower", save.towerFloor, true);
     }
 
@@ -638,7 +709,7 @@ public class GameService {
         battle.type = type;
         battle.difficulty = difficulty;
         battle.tower = tower;
-        battle.enemies = fixedEnemies == null ? createEnemies(save, difficulty, Math.max(1, save.party.size())) : fixedEnemies;
+        battle.enemies = fixedEnemies == null ? createEnemies(save, difficulty, Math.max(1, save.party.size()), tower) : fixedEnemies;
         for (CharacterState enemy : battle.enemies) {
             addCodex(save, enemy.name);
         }
@@ -854,20 +925,21 @@ public class GameService {
             battle.drops.add("突破丹 ×1");
             addCodex(save, "突破丹");
         }
+        if (battle.tower && battle.difficulty % 10 == 0) {
+            addCount(save.inventory, "creation_pill", 20);
+            battle.drops.add("造化丹 ×20");
+            addCodex(save, "造化丹");
+        }
         if (battle.tower) {
             save.highestTowerFloor = Math.max(save.highestTowerFloor, save.towerFloor);
-            save.towerFloor = Math.min(30, save.towerFloor + 1);
+            save.towerFloor = Math.min(51, save.towerFloor + 1);
         }
         if (battle.type != null && battle.type.startsWith("trial_")) {
             String element = battle.type.substring("trial_".length());
             save.resources.fiveElementEssence += 2;
             battle.essence += 2;
-            ItemDef manual = trialManual(element);
-            if (manual != null && random.nextInt(100) < 50) {
-                addCount(save.inventory, manual.id, 1);
-                addCodex(save, manual.name);
-                battle.drops.add(manual.name + " ×1");
-            }
+            dropTrialManual(save, battle, element, "良品", 40);
+            dropTrialManual(save, battle, element, "灵品", 10);
         }
         if (bossBattle) {
             int pillCount = battle.difficulty >= 20 ? 2 : 1;
@@ -916,7 +988,7 @@ public class GameService {
                 if (save.party.size() < 3) {
                     save.party.add(companion);
                 }
-                addCodex(save, companion.name);
+                addCompanionCodex(save, companion);
                 return "你在" + region.name() + "偶遇道友 " + companion.name + "，对方决定与你同行。";
             }
         }
@@ -927,7 +999,7 @@ public class GameService {
             if (save.party.size() < 3) {
                 save.party.add(companion);
             }
-            addCodex(save, companion.name);
+            addCompanionCodex(save, companion);
             return "山道偶遇道友 " + companion.name + "，对方决定与你同行。";
         }
         save.resources.breakthroughPill += 1;
@@ -1042,15 +1114,35 @@ public class GameService {
         logs.add(actor.name + " 使用 " + treasure.name + "，使 " + target.name + " 获得" + status + "状态" + Math.max(1, treasure.power) + "回合。");
     }
 
-    private ItemDef trialManual(String element) {
+    private void dropTrialManual(GameSave save, BattleSession battle, String element, String quality, int chance) {
+        ItemDef manual = trialManual(element, quality);
+        if (manual != null && random.nextInt(100) < chance) {
+            addCount(save.inventory, manual.id, 1);
+            addCodex(save, manual.name);
+            battle.drops.add(manual.name + " ×1");
+        }
+    }
+
+    private ItemDef trialManual(String element, String quality) {
         return Catalog.ITEMS.values().stream()
                 .filter(item -> "manual".equals(item.category))
+                .filter(item -> quality.equals(item.quality))
                 .filter(item -> {
                     SkillDef skill = Catalog.SKILLS.get(item.skillId);
                     return skill != null && element.equals(skill.element);
                 })
                 .findFirst()
                 .orElse(null);
+    }
+
+    private void addCompanionCodex(GameSave save, CharacterState companion) {
+        addCodex(save, companion.name);
+        for (String skillId : companion.skills) {
+            SkillDef skill = Catalog.SKILLS.get(skillId);
+            if (skill != null) {
+                addCodex(save, skill.name);
+            }
+        }
     }
 
     private CharacterState findAnyActor(GameSave save, BattleSession battle, String actorId) {
@@ -1082,7 +1174,7 @@ public class GameService {
         }
         BattleResult result = new BattleResult();
         result.title = title;
-        List<CharacterState> enemies = createEnemies(save, difficulty, Math.max(1, save.party.size()));
+        List<CharacterState> enemies = createEnemies(save, difficulty, Math.max(1, save.party.size()), tower);
         for (CharacterState enemy : enemies) {
             addCodex(save, enemy.name);
         }
@@ -1143,9 +1235,13 @@ public class GameService {
                 save.resources.breakthroughPill += 1;
                 result.drops.add("突破丹 ×1");
             }
+            if (tower && difficulty % 10 == 0) {
+                addCount(save.inventory, "creation_pill", 20);
+                result.drops.add("造化丹 ×20");
+            }
             if (tower) {
                 save.highestTowerFloor = Math.max(save.highestTowerFloor, save.towerFloor);
-                save.towerFloor = Math.min(30, save.towerFloor + 1);
+                save.towerFloor = Math.min(51, save.towerFloor + 1);
             }
             result.logs.add("战斗胜利，获得灵石 " + result.spiritStones + "、经验 " + result.exp + "。");
         } else {
@@ -1285,14 +1381,14 @@ public class GameService {
         return Math.max(1, Math.min(playerLevel + 5, Math.max(playerLevel - 5, target)));
     }
 
-    private List<CharacterState> createEnemies(GameSave save, int difficulty, int count) {
+    private List<CharacterState> createEnemies(GameSave save, int difficulty, int count, boolean tower) {
         AdventureRegion region = battleRegion(save, difficulty);
         List<String> names = region.enemies();
         int playerLevel = mainLevel(save);
         List<CharacterState> enemies = new ArrayList<>();
         for (int i = 0; i < Math.min(3, count); i++) {
             String element = Catalog.ELEMENTS.get((difficulty + i) % Catalog.ELEMENTS.size());
-            int enemyLevel = enemyLevelNearPlayer(playerLevel, difficulty + i);
+            int enemyLevel = tower ? Math.max(1, difficulty) : enemyLevelNearPlayer(playerLevel, difficulty + i);
             CharacterState enemy = new CharacterState();
             enemy.id = "enemy_" + i + "_" + random.nextInt(9999);
             enemy.name = names.get(Math.floorMod(difficulty + i + random.nextInt(names.size()), names.size()));
@@ -1495,6 +1591,64 @@ public class GameService {
         return Math.min(90, (currentRealmIndex + 1) * 10);
     }
 
+    private int breakthroughPillCost(CharacterState character) {
+        int currentRealmIndex = REALMS.indexOf(character.realm);
+        if (currentRealmIndex < 0) {
+            currentRealmIndex = 0;
+        }
+        return Math.max(1, currentRealmIndex + 1);
+    }
+
+    private int unlockedElementLimit(CharacterState character) {
+        return Math.min(Catalog.ELEMENTS.size(), Math.max(1, character.level / 10 + 1));
+    }
+
+    private CharacterState player(GameSave save) {
+        return save.party.stream()
+                .filter(character -> "player".equals(character.id) || !character.companion)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("主角不存在"));
+    }
+
+    private void ensurePlayerElementMemory(CharacterState character) {
+        if (character.unlockedElements == null) {
+            character.unlockedElements = new ArrayList<>();
+        }
+        if (character.elementSkills == null) {
+            character.elementSkills = new LinkedHashMap<>();
+        }
+        if (character.element != null && !character.unlockedElements.contains(character.element)) {
+            character.unlockedElements.add(character.element);
+        }
+        if (character.element != null && !character.elementSkills.containsKey(character.element)) {
+            List<String> remembered = character.skills == null || character.skills.isEmpty()
+                    ? new ArrayList<>(Catalog.initialSkills(character.element))
+                    : new ArrayList<>(character.skills);
+            character.elementSkills.put(character.element, remembered);
+        }
+    }
+
+    private void rememberCurrentElementSkills(CharacterState character) {
+        ensurePlayerElementMemory(character);
+        if (character.element != null) {
+            character.elementSkills.put(character.element, new ArrayList<>(character.skills));
+        }
+    }
+
+    private void rememberElementSkill(CharacterState character, String element, String skillId) {
+        if (!"player".equals(character.id)) {
+            return;
+        }
+        ensurePlayerElementMemory(character);
+        List<String> remembered = character.elementSkills.computeIfAbsent(element, ignored -> new ArrayList<>(Catalog.initialSkills(element)));
+        if (!remembered.contains(skillId)) {
+            remembered.add(skillId);
+        }
+        if (element.equals(character.element) && !character.skills.contains(skillId)) {
+            character.skills.add(skillId);
+        }
+    }
+
     private int decomposeValue(int price, int quantity) {
         return Math.max(1, price * Math.max(1, quantity) / 2);
     }
@@ -1627,6 +1781,15 @@ public class GameService {
         }
         if (character.skills == null) {
             character.skills = new ArrayList<>();
+        }
+        if (character.unlockedElements == null) {
+            character.unlockedElements = new ArrayList<>();
+        }
+        if (character.elementSkills == null) {
+            character.elementSkills = new LinkedHashMap<>();
+        }
+        if ("player".equals(character.id)) {
+            ensurePlayerElementMemory(character);
         }
         if (character.equipment == null) {
             character.equipment = new java.util.HashMap<>();

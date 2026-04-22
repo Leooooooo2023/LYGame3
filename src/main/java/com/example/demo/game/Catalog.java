@@ -22,26 +22,31 @@ public final class Catalog {
         addSkill("metal_slash", "金光斩", "金", "magical", 135, 20, "", 0);
         addSkill("metal_finger", "裂金指", "金", "magical", 110, 12, "", 0);
         addSkill("metal_poison", "金毒针", "金", "magical", 95, 28, "中毒", 3);
+        addSkill("metal_sword_array", "大庚剑阵", "金", "magical", 125, 55, "", 0);
 
         addSkill("wood_vine", "青藤术", "木", "magical", 90, 5, "", 0);
         addSkill("wood_heal", "长春功", "木", "heal", 30, 25, "", 0);
         addSkill("wood_whip", "毒藤鞭", "木", "magical", 105, 12, "", 0);
         addSkill("wood_poison", "腐毒术", "木", "magical", 85, 24, "中毒", 3);
+        addSkill("wood_spring_heal", "回春术", "木", "heal", 50, 65, "", 0);
 
         addSkill("water_arrow", "水箭术", "水", "magical", 90, 5, "", 0);
         addSkill("water_ice", "玄冰刺", "水", "magical", 125, 22, "", 0);
         addSkill("water_dragon", "水龙卷", "水", "magical", 120, 28, "", 0);
         addSkill("water_slow", "寒毒咒", "水", "magical", 90, 30, "减速", 2);
+        addSkill("water_freeze", "冰封术", "水", "magical", 115, 60, "减速", 2);
 
         addSkill("fire_bolt", "火弹术", "火", "magical", 90, 5, "", 0);
         addSkill("fire_flame", "烈焰术", "火", "magical", 150, 30, "", 0);
         addSkill("fire_rain", "火雨术", "火", "magical", 130, 34, "", 0);
         addSkill("fire_burn", "炎毒术", "火", "magical", 105, 36, "灼烧", 3);
+        addSkill("fire_heaven_flame", "天火术", "火", "magical", 130, 70, "灼烧", 2);
 
         addSkill("earth_stone", "落石术", "土", "magical", 90, 5, "", 0);
         addSkill("earth_spike", "地刺术", "土", "magical", 120, 20, "", 0);
         addSkill("earth_rock", "飞岩术", "土", "magical", 125, 24, "", 0);
         addSkill("earth_poison", "土毒咒", "土", "magical", 100, 28, "中毒", 3);
+        addSkill("earth_quake", "地动术", "土", "magical", 120, 55, "", 0);
 
         addEquipment("bamboo_sword", "青竹剑", "weapon", "凡品", "以灵竹削成的轻剑，锋利不足，却适合初入仙途的散修练手。", 6, 0, 0, 0, 80);
         addEquipment("steel_sword", "精钢剑", "weapon", "良品", "凡铁百炼而成，剑身沉稳，可明显提升武力。", 14, 0, 0, 0, 280);
@@ -71,11 +76,16 @@ public final class Catalog {
         addItem("stabilizing_pill", "定灵丹", "pill", "精品", "稳固灵台，使用后恢复60%灵力。", 180, 0, 60);
         addItem("creation_pill", "造化丹", "pill", "灵品", "少见的恢复灵丹，使用后同时恢复60%体力与灵力。", 420, 60, 60);
         addItem("breakthrough_pill", "突破丹", "breakthrough", "良品", "冲击境界瓶颈所需丹药，每次突破都会消耗1枚。", 300, 0, 0);
-        addManual("manual_metal_poison", "金毒针秘籍", "良品", "记载金毒针的秘籍，可让金属性角色学习中毒法术。", 360, "metal_poison");
-        addManual("manual_wood_poison", "腐毒术秘籍", "良品", "记载腐毒术的秘籍，可让木属性角色学习中毒法术。", 360, "wood_poison");
-        addManual("manual_water_slow", "寒毒咒秘籍", "良品", "记载寒毒咒的秘籍，可让水属性角色学习减速法术。", 360, "water_slow");
-        addManual("manual_fire_burn", "炎毒术秘籍", "良品", "记载炎毒术的秘籍，可让火属性角色学习灼烧法术。", 360, "fire_burn");
-        addManual("manual_earth_poison", "土毒咒秘籍", "良品", "记载土毒咒的秘籍，可让土属性角色学习中毒法术。", 360, "earth_poison");
+        addManual("manual_metal_poison", "金毒针秘籍", "良品", "记载金毒针的秘籍，可让金属性角色学习中毒法术。五行试炼洞掉落概率40%。", 360, "metal_poison");
+        addManual("manual_wood_poison", "腐毒术秘籍", "良品", "记载腐毒术的秘籍，可让木属性角色学习中毒法术。五行试炼洞掉落概率40%。", 360, "wood_poison");
+        addManual("manual_water_slow", "寒毒咒秘籍", "良品", "记载寒毒咒的秘籍，可让水属性角色学习减速法术。五行试炼洞掉落概率40%。", 360, "water_slow");
+        addManual("manual_fire_burn", "炎毒术秘籍", "良品", "记载炎毒术的秘籍，可让火属性角色学习灼烧法术。五行试炼洞掉落概率40%。", 360, "fire_burn");
+        addManual("manual_earth_poison", "土毒咒秘籍", "良品", "记载土毒咒的秘籍，可让土属性角色学习中毒法术。五行试炼洞掉落概率40%。", 360, "earth_poison");
+        addManual("manual_metal_sword_array", "大庚剑阵秘籍", "灵品", "记载大庚剑阵的灵品秘籍，只能通过五行试炼洞获得，掉落概率10%。", 0, "metal_sword_array");
+        addManual("manual_wood_spring_heal", "回春术秘籍", "灵品", "记载回春术的灵品秘籍，只能通过五行试炼洞获得，掉落概率10%。", 0, "wood_spring_heal");
+        addManual("manual_water_freeze", "冰封术秘籍", "灵品", "记载冰封术的灵品秘籍，只能通过五行试炼洞获得，掉落概率10%。", 0, "water_freeze");
+        addManual("manual_fire_heaven_flame", "天火术秘籍", "灵品", "记载天火术的灵品秘籍，只能通过五行试炼洞获得，掉落概率10%。", 0, "fire_heaven_flame");
+        addManual("manual_earth_quake", "地动术秘籍", "灵品", "记载地动术的灵品秘籍，只能通过五行试炼洞获得，掉落概率10%。", 0, "earth_quake");
 
         addTreasure("spring_charm", "回春符", "凡品", "heal", "ally", "战斗中恢复一名队友45%最大体力，适合开局保命。", 28, 45, 180);
         addTreasure("spirit_charm", "聚灵符", "凡品", "mp", "ally", "战斗中恢复一名队友45%最大灵力。", 28, 45, 180);
@@ -102,7 +112,7 @@ public final class Catalog {
     }
 
     public static Collection<ItemDef> shopItems() {
-        return ITEMS.values();
+        return ITEMS.values().stream().filter(item -> item.price > 0).toList();
     }
 
     public static Collection<MagicTreasureDef> shopTreasures() {

@@ -122,9 +122,19 @@ public class GameController {
         return gameService.updateParty(id, request);
     }
 
+    @PostMapping("/{id}/dual-cultivation")
+    public GameSave dualCultivation(@PathVariable String id, @RequestBody SimpleRequest request) {
+        return gameService.dualCultivation(id, request.characterId);
+    }
+
     @PostMapping("/{id}/breakthrough")
     public GameSave breakthrough(@PathVariable String id, @RequestBody SimpleRequest request) {
         return gameService.breakthrough(id, request.characterId);
+    }
+
+    @PostMapping("/{id}/element/convert")
+    public GameSave convertElement(@PathVariable String id, @RequestBody SimpleRequest request) {
+        return gameService.convertPlayerElement(id, request.element);
     }
 
     @PostMapping("/{id}/explore")

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>凡人修仙外传 v0.5</title>
+    <title>凡人修仙外传 v0.6</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -138,6 +138,37 @@
             background: #fffdf7;
         }
         .avatar span { position: relative; z-index: 0; }
+        .item-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            min-width: 0;
+        }
+        .item-icon {
+            width: 2rem;
+            height: 2rem;
+            flex: 0 0 2rem;
+            display: inline-grid;
+            place-items: center;
+            border: 1px solid #171717;
+            background: #fffdf7;
+            color: #171717;
+            font-weight: 700;
+            line-height: 1;
+            overflow: hidden;
+        }
+        .item-icon img { width: 100%; height: 100%; object-fit: contain; padding: 0.18rem; }
+        .codex-head {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            min-width: 0;
+        }
+        .codex-head .avatar {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 0;
+        }
         .unit-head {
             display: grid;
             grid-template-columns: 58px minmax(0, 1fr);
@@ -267,7 +298,7 @@
     <main v-if="screen === 'menu'" class="menu main-menu">
         <button class="music-toggle" @click="toggleMusic">{{ musicLabel }}</button>
         <section class="title-block">
-            <p class="subtitle">v0.5 网页端单机修仙回合制</p>
+            <p class="subtitle">v0.6 网页端单机修仙回合制</p>
             <p v-if="message" class="message">{{ message }}</p>
             <div class="stack">
                 <button @click="screen = 'create'">新的旅程</button>
@@ -324,7 +355,7 @@
                 <div v-for="save in saves" :key="save.id" class="save-row">
                     <button class="save-load" @click="selectSave(save.id)">
                         <strong>{{ save.party[0]?.name || '无名散修' }}</strong>
-                        <span class="muted">{{ save.party[0]?.realm }}{{ save.party[0]?.realmLevel }}级 · 锁妖塔{{ save.towerFloor }}层 · {{ save.currentArea }}</span>
+                        <span class="muted">{{ save.party[0]?.realm }} · {{ saveTowerLabel(save) }} · {{ save.currentArea }}</span>
                     </button>
                     <button class="danger" @click="openDeleteSave(save)">删除</button>
                 </div>
@@ -338,7 +369,7 @@
                 <h3>删除存档</h3>
                 <p class="desc">确定删除「{{ deleteSaveTarget?.party?.[0]?.name || '无名散修' }}」的进度吗？此操作不可恢复。</p>
                 <p class="muted" v-if="deleteSaveTarget">
-                    {{ deleteSaveTarget.party?.[0]?.realm }}{{ deleteSaveTarget.party?.[0]?.realmLevel }}级 · 锁妖塔{{ deleteSaveTarget.towerFloor }}层
+                    {{ deleteSaveTarget.party?.[0]?.realm }} · {{ saveTowerLabel(deleteSaveTarget) }}
                 </p>
                 <div class="row" style="margin-top: 1rem">
                     <button class="danger" @click="confirmDeleteSave">确认删除</button>
@@ -351,7 +382,7 @@
     <main v-else-if="screen === 'about'" class="menu main-menu">
         <section class="title-block">
             <h2>关于游戏</h2>
-            <p class="subtitle">开发者：李涌 · 版本：v0.5 · 发布目标：地图扩展、敌人扩展、法宝平衡、主菜单背景</p>
+            <p class="subtitle">开发者：李涌 · 版本：v0.6 · 发布目标：五行转换、双修养成、图鉴扩展、锁妖塔扩展</p>
             <div class="stack">
                 <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、秘籍学习、法宝使用、五行试炼、境界突破。</p>
                 <button @click="screen = 'menu'">返回</button>
@@ -365,7 +396,7 @@
                 <button @click="screen = 'menu'">返回主菜单</button>
                 <div>
                     <h2>{{ save.party[0]?.name }}的修仙路</h2>
-                    <div class="muted">{{ save.currentArea }} · 锁妖塔第 {{ save.towerFloor }} 层</div>
+                    <div class="muted">{{ save.currentArea }} · {{ saveTowerLabel(save) }}</div>
                 </div>
             </div>
             <div class="resources">
@@ -432,7 +463,7 @@
                                         </div>
                                         <div>
                                             <h3>{{ role.name }}</h3>
-                                            <p class="muted">{{ role.element }}属性 · {{ role.realm }}{{ role.realmLevel }}级</p>
+                                            <p class="muted">{{ role.element }}属性 · {{ role.realm }}</p>
                                         </div>
                                     </div>
                                     <div class="meter"><span :style="{width: percent(role.hp, role.maxHp) + '%'}"></span></div>
@@ -464,7 +495,10 @@
 
                             <div v-if="battleActionMode === 'items'" class="grid two" style="margin-top: 1rem">
                                 <button class="target-button" v-for="(count, id) in battle.save.inventory" :key="id" @click="setPendingItem(id)" :disabled="item(id).category !== 'pill'">
-                                    <strong>{{ itemName(id) }} ×{{ count }}</strong><br>
+                                    <strong class="item-title">
+                                        <span class="item-icon"><img :src="itemIconUrl(id)" :alt="itemName(id)" @error="hideBrokenAvatar"></span>
+                                        <span>{{ itemName(id) }} ×{{ count }}</span>
+                                    </strong><br>
                                     <span class="muted">{{ itemEffect(id) }}</span>
                                 </button>
                             </div>
@@ -508,7 +542,7 @@
                                 <img :key="avatarUrl(role)" :src="avatarUrl(role)" :alt="role.name" @error="hideBrokenAvatar">
                             </div>
                             <h3>{{ role.name }}</h3>
-                            <div class="muted">{{ role.realm }}{{ role.realmLevel }}级 · 等级 {{ role.level }}</div>
+                            <div class="muted">{{ role.realm }} · 等级 {{ role.level }}</div>
                             <div class="meter"><span :style="{width: percent(role.exp, role.nextExp) + '%'}"></span></div>
                             <div>经验 {{ role.exp }}/{{ role.nextExp }}</div>
                             <div class="meter"><span :style="{width: percent(role.hp, role.maxHp) + '%'}"></span></div>
@@ -533,7 +567,10 @@
                             <div class="list" style="margin-top: 0.65rem">
                                 <div v-for="entry in ownedPillItems" :key="entry.id" class="card">
                                     <div class="row">
-                                        <strong :class="'quality-' + item(entry.id).quality">{{ itemName(entry.id) }} ×{{ entry.count }}</strong>
+                                        <strong class="item-title" :class="'quality-' + item(entry.id).quality">
+                                            <span class="item-icon"><img :src="itemIconUrl(entry.id)" :alt="itemName(entry.id)" @error="hideBrokenAvatar"></span>
+                                            <span>{{ itemName(entry.id) }} ×{{ entry.count }}</span>
+                                        </strong>
                                         <button v-for="role in save.party" :key="role.id" @click="usePill(role.id, entry.id)">给{{ role.name }}</button>
                                     </div>
                                     <p class="desc">{{ item(entry.id).description }}</p>
@@ -547,7 +584,10 @@
                             <div class="list" style="margin-top: 0.65rem">
                                 <div v-for="entry in ownedManualItems" :key="entry.id" class="card">
                                     <div class="row">
-                                        <strong :class="'quality-' + item(entry.id).quality">{{ itemName(entry.id) }} ×{{ entry.count }}</strong>
+                                        <strong class="item-title" :class="'quality-' + item(entry.id).quality">
+                                            <span class="item-icon"><img :src="itemIconUrl(entry.id)" :alt="itemName(entry.id)" @error="hideBrokenAvatar"></span>
+                                            <span>{{ itemName(entry.id) }} ×{{ entry.count }}</span>
+                                        </strong>
                                         <button @click="openManualDialog(entry.id)">学习</button>
                                     </div>
                                     <p class="desc">{{ item(entry.id).description }}</p>
@@ -593,7 +633,10 @@
                             <div class="list shop-list" style="margin-top: 0.65rem">
                                 <div v-for="item in shopPillItems" :key="item.id" class="card">
                                     <div class="row">
-                                        <strong :class="'quality-' + item.quality">{{ item.name }} · {{ item.quality }}</strong>
+                                        <strong class="item-title" :class="'quality-' + item.quality">
+                                            <span class="item-icon"><img :src="itemIconUrl(item.id)" :alt="item.name" @error="hideBrokenAvatar"></span>
+                                            <span>{{ item.name }} · {{ item.quality }}</span>
+                                        </strong>
                                         <span>{{ item.price }}灵石</span>
                                         <button @click="openBuyDialog(item.id)">购买</button>
                                     </div>
@@ -608,7 +651,10 @@
                             <div class="list shop-list" style="margin-top: 0.65rem">
                                 <div v-for="item in shopManualItems" :key="item.id" class="card">
                                     <div class="row">
-                                        <strong :class="'quality-' + item.quality">{{ item.name }} · {{ item.quality }}</strong>
+                                        <strong class="item-title" :class="'quality-' + item.quality">
+                                            <span class="item-icon"><img :src="itemIconUrl(item.id)" :alt="item.name" @error="hideBrokenAvatar"></span>
+                                            <span>{{ item.name }} · {{ item.quality }}</span>
+                                        </strong>
                                         <span>{{ item.price }}灵石</span>
                                         <button @click="openBuyDialog(item.id)">购买</button>
                                     </div>
@@ -716,20 +762,30 @@
 
                 <template v-else-if="tab === 'realm'">
                     <h3>渡劫突破</h3>
-                    <p class="desc">境界路线：{{ realmList.join(' → ') }}。每次突破消耗突破丹 ×1，失败也会消耗丹药；越往后天劫越凶险，失败率每个境界递增10%。成功后全属性提升50%，并恢复全部体力与灵力。</p>
+                    <p class="desc">境界路线：{{ realmList.join(' → ') }}。突破丹消耗随大境界递增，失败也会消耗丹药；越往后天劫越凶险，失败率每个境界递增10%。成功后全属性提升25%，并恢复全部体力与灵力。</p>
                     <div class="grid" style="margin-top: 0.85rem">
                         <article class="card" v-for="role in save.party" :key="role.id">
                             <h3>{{ role.name }}</h3>
-                            <p>{{ role.realm }}{{ role.realmLevel }}级 · 等级 {{ role.level }}</p>
-                            <p class="muted">下一境界：{{ nextRealm(role) }}。条件：等级达到 {{ breakthroughLevel(role) }}，突破丹 ×1。当前失败率：{{ breakthroughFailRate(role) }}%。</p>
+                            <p>{{ role.realm }} · 等级 {{ role.level }}</p>
+                            <p class="muted">下一境界：{{ nextRealm(role) }}。条件：等级达到 {{ breakthroughLevel(role) }}，突破丹 ×{{ breakthroughPillCost(role) }}。当前失败率：{{ breakthroughFailRate(role) }}%。</p>
                             <button @click="breakthrough(role.id)">开始突破</button>
                         </article>
                     </div>
+                    <article class="card" style="margin-top: 1rem" v-if="playerRole">
+                        <h3>主角五行转换</h3>
+                        <p class="desc">只有主角可以转换五行。主角从10级开始，每升10级可多解锁一种五行属性；解锁新属性消耗五行精华 ×100。每种五行会保存自己的技能记录，切换回来时不会丢失之前学过的技能。</p>
+                        <p class="muted">当前五行：{{ playerRole.element }}。已解锁 {{ unlockedElements(playerRole).length }}/{{ unlockedElementLimit(playerRole) }}。当前五行精华：{{ save.resources.fiveElementEssence }}</p>
+                        <div class="grid two" style="margin-top: 0.85rem">
+                            <button v-for="element in elements" :key="element" @click="convertElement(element)" :disabled="!canConvertElement(element)">
+                                {{ elementButtonText(element) }}
+                            </button>
+                        </div>
+                    </article>
                 </template>
 
                 <template v-else-if="tab === 'companions'">
                     <h3>道友</h3>
-                    <p class="muted">选择最多 2 名已结识道友出战。道友每 5 点好感度为自身全属性 +1。</p>
+                    <p class="muted">选择最多 2 名已结识道友出战。道友每 5 点好感度为自身全属性 +1；与主角性别不同且已获得的道友可双修，每次消耗造化丹 ×10，好感度 +20，上限 100。</p>
                     <div class="grid" style="margin-top: 0.85rem">
                         <article class="card" v-for="role in save.companions" :key="role.id">
                             <div class="avatar">
@@ -742,6 +798,10 @@
                             <button v-if="role.unlocked" @click="toggleCompanion(role.id)">
                                 {{ selectedCompanions.includes(role.id) ? '取消出战' : '加入出战' }}
                             </button>
+                            <button v-if="role.unlocked" @click="dualCultivation(role.id)" :disabled="!canDualCultivate(role)" style="margin-top: 0.55rem">
+                                双修
+                            </button>
+                            <p v-if="role.unlocked" class="muted">{{ dualCultivationHint(role) }}</p>
                         </article>
                     </div>
                     <div class="row" style="margin-top: 1rem">
@@ -769,8 +829,17 @@
                     </div>
                     <div class="grid two">
                         <article class="card" v-for="entry in currentCodex.entries" :key="entry">
-                            <h3>{{ entry }}</h3>
-                            <p class="muted">{{ currentCodex.name }}</p>
+                            <div class="codex-head">
+                                <div v-if="codexAvatar(entry)" class="avatar">
+                                    <span>{{ avatarFallback(codexAvatar(entry)) }}</span>
+                                    <img :key="avatarUrl(codexAvatar(entry))" :src="avatarUrl(codexAvatar(entry))" :alt="entry" @error="hideBrokenAvatar">
+                                </div>
+                                <span v-else-if="codexItem(entry)" class="item-icon"><img :src="itemIconUrl(codexItem(entry).id)" :alt="entry" @error="hideBrokenAvatar"></span>
+                                <div>
+                                    <h3>{{ entry }}</h3>
+                                    <p class="muted">{{ currentCodex.name }}</p>
+                                </div>
+                            </div>
                             <p class="desc">{{ codexDescription(entry) }}</p>
                         </article>
                     </div>
@@ -787,7 +856,7 @@
             <aside class="panel nav">
                 <button @click="openInn">客栈</button>
                 <button @click="mapDialog = true" :disabled="!!battle && !battle.finished">地图探索</button>
-                <button @click="startTowerBattle" :disabled="!!battle && !battle.finished">锁妖塔</button>
+                <button @click="openTowerDialog" :disabled="!!battle && !battle.finished">锁妖塔</button>
                 <button @click="trialDialog = true" :disabled="!!battle && !battle.finished">五行洞</button>
                 <button @click="openBossDialog('wanmo')" :disabled="!!battle && !battle.finished">万魔窟</button>
                 <button @click="openBossDialog('xianling')" :disabled="!!battle && !battle.finished">仙灵洞</button>
@@ -805,6 +874,22 @@
                 <div class="row" style="margin-top: 1rem">
                     <button @click="inn" :disabled="save.resources.spiritStones < innCost">确认恢复</button>
                     <button @click="innDialog = false">暂不恢复</button>
+                </div>
+            </section>
+        </div>
+
+        <div v-if="towerDialog" class="modal-mask" @click.self="towerDialog = false">
+            <section class="modal">
+                <h3>锁妖塔</h3>
+                <p class="desc">锁妖塔共50层，每层遭遇敌人，敌人等级等同当前挑战层数。胜利后进入下一层，失败保留当前层数。</p>
+                <p><strong>当前层数：{{ towerFloorLabel }}</strong></p>
+                <p class="muted">本层敌人等级：{{ towerEnemyLevel }}</p>
+                <p class="muted">基础奖励：灵石 {{ towerReward.stones }}，五行精华 {{ towerReward.essence }}，经验 {{ towerReward.exp }}。</p>
+                <p class="muted">每5层额外获得突破丹 ×1；每10层额外获得造化丹 ×20。</p>
+                <p v-if="towerBonusText"><strong>本层额外奖励：{{ towerBonusText }}</strong></p>
+                <div class="row" style="margin-top: 1rem">
+                    <button @click="startTowerBattle" :disabled="towerCompleted">确定进入</button>
+                    <button @click="towerDialog = false">返回</button>
                 </div>
             </section>
         </div>
@@ -869,7 +954,10 @@
         <div v-if="manualDialog" class="modal-mask" @click.self="closeManualDialog">
             <section class="modal">
                 <h3>学习秘籍</h3>
-                <p class="desc">{{ itemName(selectedManualId) }} · {{ item(selectedManualId).description }}</p>
+                <p class="desc item-title">
+                    <span class="item-icon"><img :src="itemIconUrl(selectedManualId)" :alt="itemName(selectedManualId)" @error="hideBrokenAvatar"></span>
+                    <span>{{ itemName(selectedManualId) }} · {{ item(selectedManualId).description }}</span>
+                </p>
                 <div class="list">
                     <button v-for="role in save.party" :key="role.id" @click="learnManual(role.id, selectedManualId)">
                         {{ role.name }} 学习
@@ -885,7 +973,7 @@
                 <p class="desc">选择要探索的区域。每个地图区域只会遇到一位固定道友，胜利后有机会触发结识事件。</p>
                 <p class="muted">当前主角等级：{{ playerLevel }}</p>
                 <div class="list" style="margin-top: 1rem">
-                    <button v-for="region in adventureMaps" :key="region.id" @click="startAdventure(region.id)" :disabled="playerLevel < region.minLevel">
+                    <button v-for="region in adventureMaps" :key="region.id" @click="startAdventure(region.id)">
                         {{ region.name }}
                         <span class="muted"> · 可遇道友：{{ region.companionName }}</span>
                     </button>
@@ -897,7 +985,7 @@
         <div v-if="trialDialog" class="modal-mask" @click.self="trialDialog = false">
             <section class="modal">
                 <h3>五行试炼洞</h3>
-                <p class="desc">选择一种五行试炼。胜利后额外获得五行精华，并有机会掉落对应属性秘籍。</p>
+                <p class="desc">选择一种五行试炼。胜利后额外获得五行精华，并有机会掉落对应属性秘籍：良品秘籍40%，灵品秘籍10%。灵品秘籍只能通过五行洞获得。</p>
                 <div class="grid two" style="margin-top: 1rem">
                     <button v-for="element in elements" :key="element" @click="startTrial(element)">{{ element }}行洞</button>
                 </div>
@@ -956,6 +1044,7 @@ createApp({
             mapDialog: false,
             trialDialog: false,
             bossDialog: false,
+            towerDialog: false,
             selectedBoss: null,
             selectedCompanions: [],
             musicOn: false,
@@ -977,6 +1066,9 @@ createApp({
         },
         adventureMaps() {
             return this.catalog.maps || [];
+        },
+        playerRole() {
+            return this.save?.party?.find(role => role.id === "player" || !role.companion) || null;
         },
         ownedPillItems() {
             return this.ownedItemsByCategory("pill");
@@ -1011,6 +1103,29 @@ createApp({
         musicLabel() {
             return this.musicOn ? "关闭音乐" : "开启音乐";
         },
+        towerCompleted() {
+            return (this.save?.towerFloor || 1) > 50;
+        },
+        towerEnemyLevel() {
+            return Math.min(50, Math.max(1, this.save?.towerFloor || 1));
+        },
+        towerFloorLabel() {
+            return this.towerCompleted ? "已通关50层" : `第 ${this.towerEnemyLevel} 层`;
+        },
+        towerReward() {
+            const level = this.towerEnemyLevel;
+            return {
+                stones: 120 + level * 40,
+                essence: Math.max(1, Math.floor(level / 3)),
+                exp: 80 + level * 35
+            };
+        },
+        towerBonusText() {
+            const rewards = [];
+            if (this.towerEnemyLevel % 5 === 0) rewards.push("突破丹 ×1");
+            if (this.towerEnemyLevel % 10 === 0) rewards.push("造化丹 ×20");
+            return rewards.join("，");
+        },
         deleteSaveTarget() {
             return this.saves.find(save => save.id === this.deleteSaveId) || null;
         },
@@ -1042,6 +1157,7 @@ createApp({
             const treasureNames = Object.values(this.catalog.treasures || {}).map(x => x.name);
             const skillNames = Object.values(this.catalog.skills || {}).map(x => x.name);
             const companionNames = (this.save?.companions || []).map(x => x.name);
+            const bossNames = this.bossNames;
             const monsterNames = this.monsterNames;
             const used = new Set();
             const take = (key, name, list) => {
@@ -1054,10 +1170,14 @@ createApp({
                 take("items", "道具图鉴", by(x => itemNames.includes(x))),
                 take("skills", "功法图鉴", by(x => skillNames.includes(x))),
                 take("companions", "道友图鉴", by(x => companionNames.includes(x))),
+                take("bosses", "BOSS图鉴", by(x => bossNames.includes(x))),
                 take("monsters", "怪物图鉴", by(x => monsterNames.includes(x)))
             ];
             groups.push({ key: "progress", name: "进度统计", entries: entries.filter(x => !used.has(x)) });
             return groups;
+        },
+        bossNames() {
+            return ["古魔", "灵界修士"];
         },
         monsterNames() {
             return [
@@ -1253,8 +1373,12 @@ createApp({
                 this.message = error.message;
             }
         },
+        openTowerDialog() {
+            this.towerDialog = true;
+        },
         async startTowerBattle() {
             try {
+                this.towerDialog = false;
                 this.battle = await this.request(`/api/game/${this.save.id}/battle/tower/start`, { method: "POST" });
                 this.save = this.battle.save;
                 this.pendingAction = null;
@@ -1399,6 +1523,39 @@ createApp({
                 await this.reloadCurrentSave();
             }
         },
+        async convertElement(element) {
+            try {
+                const unlocked = this.unlockedElements(this.playerRole).includes(element);
+                this.save = await this.request(`/api/game/${this.save.id}/element/convert`, {
+                    method: "POST",
+                    body: JSON.stringify({ element })
+                });
+                this.message = unlocked ? `主角已切换为${element}属性。` : `已消耗五行精华 ×100，解锁并切换为${element}属性。`;
+                this.showNotice("五行转换完成", this.message);
+                this.syncPartySelection();
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+                this.showNotice("五行转换失败", error.message);
+            }
+        },
+        async dualCultivation(characterId) {
+            const role = this.save.companions.find(x => x.id === characterId);
+            try {
+                this.save = await this.request(`/api/game/${this.save.id}/dual-cultivation`, {
+                    method: "POST",
+                    body: JSON.stringify({ characterId })
+                });
+                const updated = this.save.companions.find(x => x.id === characterId);
+                this.message = `${updated?.name || role?.name || "道友"} 双修完成，好感度提升到 ${updated?.affection ?? ""}。`;
+                this.showNotice("双修完成", this.message);
+                this.syncPartySelection();
+                await this.loadSaves();
+            } catch (error) {
+                this.message = error.message;
+                this.showNotice("双修失败", error.message);
+            }
+        },
         async safeUpdate(url, success, body = null) {
             try {
                 this.save = await this.request(url, {
@@ -1449,6 +1606,48 @@ createApp({
             const index = this.realmIndex(role);
             return this.realmList[index + 1] ? Math.min(90, (index + 1) * 10) : 0;
         },
+        breakthroughPillCost(role) {
+            const index = this.realmIndex(role);
+            return this.realmList[index + 1] ? index + 1 : "-";
+        },
+        unlockedElementLimit(role) {
+            return Math.min(this.elements.length, Math.max(1, Math.floor((role?.level || 1) / 10) + 1));
+        },
+        unlockedElements(role) {
+            const list = role?.unlockedElements || [];
+            return list.length ? list : [role?.element].filter(Boolean);
+        },
+        canConvertElement(element) {
+            const player = this.playerRole;
+            if (!player || element === player.element) return false;
+            const unlocked = this.unlockedElements(player).includes(element);
+            if (unlocked) return true;
+            return this.unlockedElements(player).length < this.unlockedElementLimit(player)
+                && (this.save?.resources?.fiveElementEssence || 0) >= 100;
+        },
+        elementButtonText(element) {
+            const player = this.playerRole;
+            if (!player) return element;
+            if (element === player.element) return `${element}属性（当前）`;
+            if (this.unlockedElements(player).includes(element)) return `切换为${element}属性`;
+            return `解锁${element}属性（100精华）`;
+        },
+        canDualCultivate(role) {
+            return !!role?.unlocked
+                && !!this.playerRole
+                && role.gender !== this.playerRole.gender
+                && role.affection < 100
+                && (this.save?.inventory?.creation_pill || 0) >= 10;
+        },
+        dualCultivationHint(role) {
+            if (!role?.unlocked) return "";
+            if (!this.playerRole) return "主角不存在。";
+            if (role.gender === this.playerRole.gender) return "只能与主角性别不同的道友双修。";
+            if (role.affection >= 100) return "好感度已达上限。";
+            const count = this.save?.inventory?.creation_pill || 0;
+            if (count < 10) return `需要造化丹 ×10，当前 ${count}。`;
+            return "双修消耗造化丹 ×10，好感度 +20。";
+        },
         percent(value, max) {
             return max ? Math.max(0, Math.min(100, Math.round(value * 100 / max))) : 0;
         },
@@ -1469,6 +1668,13 @@ createApp({
         },
         itemName(id) {
             return this.item(id).name || id;
+        },
+        saveTowerLabel(save) {
+            const floor = save?.towerFloor || 1;
+            return floor > 50 ? "锁妖塔已通关50层" : `锁妖塔第 ${floor} 层`;
+        },
+        itemIconUrl(id) {
+            return `/assets/icons/items/${id || "default"}.svg`;
         },
         itemEffect(id) {
             const item = this.item(id);
@@ -1636,6 +1842,48 @@ createApp({
                 .filter(role => role.companion)
                 .map(role => role.id);
         },
+        codexItem(entry) {
+            return Object.values(this.catalog.items || {}).find(item => item.name === entry) || null;
+        },
+        codexAvatar(entry) {
+            const companion = this.codexCompanion(entry);
+            if (companion) return companion;
+            const avatar = this.codexAvatarFile(entry);
+            return avatar ? { name: entry, avatar } : null;
+        },
+        codexCompanion(entry) {
+            if (entry === "主角") {
+                return this.playerRole;
+            }
+            return (this.save?.companions || []).find(role => role.name === entry) || null;
+        },
+        codexAvatarFile(entry) {
+            const avatars = {
+                古魔: "boss_wanmo.png",
+                灵界修士: "boss_xianling.png",
+                黑风寨匪徒: "enemy_bandit.png",
+                血煞门邪修: "enemy_blood_cultivator.png",
+                魔焰宗修士: "enemy_flame_cultivator.png",
+                鬼灵门邪修: "enemy_cultivator.png",
+                百鬼窟巫师: "enemy_ghost_wizard.png",
+                白骨老魔: "enemy_bone_demon.png",
+                银月妖狼: "enemy_wolf.png",
+                赤炎虎王: "enemy_tiger.png",
+                金背妖熊: "enemy_bear.png",
+                血玉妖藤: "enemy_blood_vine.png",
+                幻灵花妖: "enemy_flower_demon.png",
+                千年树精: "enemy_tree_spirit.png",
+                寒玉蟾蜍: "enemy_ice_toad.png",
+                玄冰蛇妖: "enemy_ice_snake.png",
+                深海章鱼: "enemy_octopus.png",
+                地火蜥蜴: "enemy_fire_lizard.png",
+                熔岩巨兽: "enemy_lava_giant.png",
+                石巨人: "enemy_stone_giant.png",
+                山岩巨怪: "enemy_rock_monster.png",
+                土行怪: "enemy_earth_creature.png"
+            };
+            return avatars[entry] || null;
+        },
         codexDescription(entry) {
             const equipment = Object.values(this.catalog.equipment || {}).find(x => x.name === entry);
             if (equipment) return equipment.description;
@@ -1647,6 +1895,7 @@ createApp({
             if (skill) return `${skill.element}属性功法，${this.damageTypeName(skill.type)}类型，威力${skill.power}%，消耗${skill.mpCost}灵力。`;
             const companion = (this.save?.companions || []).find(x => x.name === entry);
             if (companion) return `${companion.element}属性道友，已在旅途中与你结识。`;
+            if (this.bossNames.includes(entry)) return "世界BOSS挑战中记录过的强敌，拥有更高体力和更丰厚掉落。";
             if (this.monsterNames.includes(entry)) return "地图探索、锁妖塔或五行试炼中记录过的敌人。";
             return "修仙路上已经记录的关键进度。";
         }
