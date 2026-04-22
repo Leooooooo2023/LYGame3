@@ -77,13 +77,21 @@ public final class Catalog {
         addManual("manual_fire_burn", "炎毒术秘籍", "良品", "记载炎毒术的秘籍，可让火属性角色学习灼烧法术。", 360, "fire_burn");
         addManual("manual_earth_poison", "土毒咒秘籍", "良品", "记载土毒咒的秘籍，可让土属性角色学习中毒法术。", 360, "earth_poison");
 
-        addTreasure("binding_charm", "定身符", "凡品", "stun", "enemy", "战斗中使一名敌人眩晕1回合，每场每名角色只能使用一次法宝。", 30, 1, 260);
-        addTreasure("spring_charm", "回春符", "良品", "heal", "ally", "战斗中恢复一名队友50%最大体力。", 40, 50, 420);
-        addTreasure("spirit_charm", "聚灵符", "良品", "mp", "ally", "战斗中恢复一名队友50%最大灵力。", 40, 50, 420);
-        addTreasure("stun_bell", "眩晕铃", "精品", "stun", "enemy", "铃声刺入神识，使一名敌人眩晕1回合。", 40, 1, 680);
-        addTreasure("monster_rope", "缚妖索", "精品", "stun", "enemy", "以灵索束缚目标，使一名敌人眩晕2回合。", 50, 2, 920);
-        addTreasure("revival_charm", "还魂符", "灵品", "heal", "ally", "以符力护住生机，恢复一名队友80%最大体力。", 80, 80, 1500);
-        addTreasure("heaven_charm", "天罡符", "灵品", "mp", "ally", "引天罡之气入体，恢复一名队友80%最大灵力。", 90, 80, 1600);
+        addTreasure("spring_charm", "回春符", "凡品", "heal", "ally", "战斗中恢复一名队友45%最大体力，适合开局保命。", 28, 45, 180);
+        addTreasure("spirit_charm", "聚灵符", "凡品", "mp", "ally", "战斗中恢复一名队友45%最大灵力。", 28, 45, 180);
+        addTreasure("clear_charm", "清心符", "良品", "cleanse", "ally", "驱散目标队友的中毒、灼烧、减速、眩晕和束缚状态。", 32, 1, 320);
+        addTreasure("guard_charm", "护身符", "精品", "shield", "ally", "为目标队友附加护盾2回合，受到伤害降低35%。", 35, 2, 380);
+        addTreasure("power_charm", "巨力符", "良品", "attack_buff", "ally", "使目标队友武力提升30%，持续2回合。", 36, 2, 420);
+        addTreasure("focus_charm", "凝神符", "良品", "magic_buff", "ally", "使目标队友法力提升30%，持续2回合。", 36, 2, 420);
+        addTreasure("swift_charm", "神行符", "良品", "agility_buff", "ally", "使目标队友敏捷提升30%，持续2回合。", 32, 2, 380);
+        addTreasure("diamond_charm", "金刚符", "良品", "defense_buff", "ally", "使目标队友防御提升35%，持续2回合。", 42, 2, 620);
+        addTreasure("blood_soul_gourd", "血魂葫芦", "精品", "drain_hp", "enemy", "抽取一名敌人体力，造成法术伤害并为使用者回血。", 55, 120, 860);
+        addTreasure("binding_charm", "定身符", "灵品", "stun", "enemy", "战斗中使一名敌人眩晕1回合，每场每名角色只能使用一次法宝。", 60, 1, 1400);
+        addTreasure("stun_bell", "眩晕铃", "灵品", "stun", "enemy", "铃声刺入神识，使一名敌人眩晕1回合。", 70, 1, 1800);
+        addTreasure("monster_rope", "缚妖索", "仙品", "stun", "enemy", "以灵索束缚目标，使一名敌人眩晕2回合。", 95, 2, 3200);
+        addTreasure("revival_charm", "还魂符", "灵品", "revive", "ally", "复活一名倒下的队友，并恢复35%最大体力。", 85, 35, 1700);
+        addTreasure("heaven_charm", "天罡符", "灵品", "all_buff", "ally", "使目标队友全属性提升25%，持续2回合。", 75, 2, 1650);
+        addTreasure("creation_charm", "造化符", "仙品", "heal_mp", "ally", "恢复目标队友60%最大体力和60%最大灵力。", 100, 60, 2800);
     }
 
     private Catalog() {

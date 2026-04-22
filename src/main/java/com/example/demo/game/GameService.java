@@ -30,6 +30,18 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class GameService {
     private static final List<String> REALMS = List.of("炼气期", "筑基期", "金丹期", "元婴期", "化神期", "炼虚期", "合体期", "大乘期", "渡劫期", "真仙期");
+    private static final List<AdventureRegion> ADVENTURE_REGIONS = List.of(
+            new AdventureRegion("tainan", "太南山", 1, List.of("黑风寨匪徒", "银月妖狼", "鬼灵门邪修", "赤炎虎王", "石巨人"), "companion_lifeiyu"),
+            new AdventureRegion("jingzhou", "镜州荒原", 4, List.of("血煞门邪修", "金背妖熊", "地火蜥蜴", "土行怪", "幻灵花妖"), "companion_chenqiaoqian"),
+            new AdventureRegion("huangfeng", "黄枫谷外围", 8, List.of("魔焰宗修士", "寒玉蟾蜍", "血玉妖藤", "山岩巨怪", "玄冰蛇妖"), "companion_nangongwan"),
+            new AdventureRegion("yueguo", "越国边境", 12, List.of("百鬼窟巫师", "赤炎虎王", "深海章鱼", "金背妖熊", "土行怪"), "companion_qiyunxiao"),
+            new AdventureRegion("bloody_forbidden", "血色禁地", 16, List.of("白骨老魔", "千年树精", "熔岩巨兽", "玄冰蛇妖", "血玉妖藤"), "companion_yuanyao"),
+            new AdventureRegion("luanxing", "乱星海", 22, List.of("深海章鱼", "寒玉蟾蜍", "魔焰宗修士", "银月妖狼", "山岩巨怪"), "companion_ziling"),
+            new AdventureRegion("devil_valley", "坠魔谷", 28, List.of("白骨老魔", "熔岩巨兽", "千年树精", "血煞门邪修", "鬼灵门邪修"), "companion_mupeiling"),
+            new AdventureRegion("xutian_outer", "虚天殿外", 35, List.of("魔焰宗修士", "玄冰蛇妖", "金背妖熊", "千年树精", "地火蜥蜴"), "companion_mojiao"),
+            new AdventureRegion("spirit_rift", "灵界裂隙", 45, List.of("白骨老魔", "熔岩巨兽", "深海章鱼", "山岩巨怪", "血玉妖藤"), "companion_xiangzhili"),
+            new AdventureRegion("tiannan_secret", "天南秘境", 55, List.of("白骨老魔", "熔岩巨兽", "魔焰宗修士", "千年树精", "深海章鱼"), "companion_fengxi")
+    );
 
     private final ObjectMapper objectMapper;
     private final Path savePath = Path.of("data", "saves.json");
@@ -90,7 +102,7 @@ public class GameService {
 
         save.inventory.put("huanglong_pill", 5);
         save.inventory.put("heqi_pill", 5);
-        save.treasureBag.put("binding_charm", 1);
+        save.treasureBag.put("spring_charm", 1);
         save.party.get(0).equipment.put("weapon", "bamboo_sword");
         save.party.get(0).equipment.put("armor", "cloth_robe");
         addCodex(save, "主角");
@@ -101,7 +113,7 @@ public class GameService {
         addCodex(save, "合气丹");
         addCodex(save, "青竹剑");
         addCodex(save, "灰布道袍");
-        addCodex(save, "定身符");
+        addCodex(save, "回春符");
 
         saves.put(save.id, save);
         persist(save);
@@ -114,6 +126,18 @@ public class GameService {
         data.put("equipment", Catalog.shopEquipment());
         data.put("treasures", Catalog.shopTreasures());
         return data;
+    }
+
+    public List<Map<String, Object>> adventureRegions() {
+        return ADVENTURE_REGIONS.stream().map(region -> {
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("id", region.id());
+            data.put("name", region.name());
+            data.put("minLevel", region.minLevel());
+            data.put("companionId", region.companionId());
+            data.put("companionName", companionName(region.companionId()));
+            return data;
+        }).toList();
     }
 
     public GameSave buy(String saveId, String itemId, int quantity) {
@@ -436,9 +460,14 @@ public class GameService {
         return result;
     }
 
-    public BattleSession startAdventure(String saveId) {
+    public BattleSession startAdventure(String saveId, String regionId) {
         GameSave save = getSave(saveId);
-        return startBattle(save, "太南山探索", "adventure", Math.max(1, save.towerFloor - 1), false);
+        AdventureRegion region = adventureRegion(regionId);
+        if (mainLevel(save) < region.minLevel()) {
+            throw new IllegalArgumentException(region.name() + " 推荐 " + region.minLevel() + " 级后再探索");
+        }
+        int difficulty = region.minLevel();
+        return startBattle(save, region.name() + "探索", "adventure_" + region.id(), difficulty, false);
     }
 
     public BattleSession startTowerBattle(String saveId) {
@@ -547,7 +576,7 @@ public class GameService {
                     throw new IllegalArgumentException("灵力不足，无法使用法宝");
                 }
                 CharacterState target = "ally".equals(treasure.targetType)
-                        ? findLivingById(save.party, request.targetId)
+                        ? findTreasureAllyTarget(save.party, request.targetId, treasure)
                         : findLivingById(battle.enemies, request.targetId);
                 if (target == null) {
                     throw new IllegalArgumentException("请选择可用目标");
@@ -609,7 +638,7 @@ public class GameService {
         battle.type = type;
         battle.difficulty = difficulty;
         battle.tower = tower;
-        battle.enemies = fixedEnemies == null ? createEnemies(difficulty, Math.max(1, save.party.size())) : fixedEnemies;
+        battle.enemies = fixedEnemies == null ? createEnemies(save, difficulty, Math.max(1, save.party.size())) : fixedEnemies;
         for (CharacterState enemy : battle.enemies) {
             addCodex(save, enemy.name);
         }
@@ -788,8 +817,8 @@ public class GameService {
             battle.logs.add("战斗已结束，未获得奖励。");
         } else if (battle.victory) {
             applyBattleRewards(save, battle);
-            if ("adventure".equals(battle.type)) {
-                battle.postBattleEvent = triggerPostBattleEvent(save);
+            if (battle.type != null && battle.type.startsWith("adventure_")) {
+                battle.postBattleEvent = triggerPostBattleEvent(save, battle);
                 battle.logs.add("战后事件：" + battle.postBattleEvent);
             }
         } else {
@@ -845,7 +874,10 @@ public class GameService {
             save.resources.breakthroughPill += pillCount;
             battle.drops.add("突破丹 ×" + pillCount);
             addCodex(save, "突破丹");
-            String rareDrop = battle.type.contains("wanmo") ? "revival_charm" : "heaven_charm";
+            List<String> rareDrops = battle.type.contains("wanmo")
+                    ? List.of("blood_soul_gourd", "revival_charm", "monster_rope", "creation_charm")
+                    : List.of("heaven_charm", "diamond_charm", "stun_bell", "creation_charm");
+            String rareDrop = rareDrops.get(random.nextInt(rareDrops.size()));
             MagicTreasureDef treasure = Catalog.TREASURES.get(rareDrop);
             if (treasure != null && random.nextInt(100) < 45) {
                 addCount(save.treasureBag, treasure.id, 1);
@@ -856,7 +888,7 @@ public class GameService {
         battle.logs.add("战斗胜利，获得灵石 " + battle.spiritStones + "、五行精华 " + battle.essence + "、经验 " + battle.exp + "。");
     }
 
-    private String triggerPostBattleEvent(GameSave save) {
+    private String triggerPostBattleEvent(GameSave save, BattleSession battle) {
         int roll = random.nextInt(100);
         if (roll < 45) {
             int stones = 80 + random.nextInt(90);
@@ -872,8 +904,24 @@ public class GameService {
             save.resources.fiveElementEssence += 1;
             return "你炼化一缕天地灵气，获得五行精华 ×1。";
         }
+        AdventureRegion region = regionFromBattleType(battle.type);
+        if (region != null) {
+            Optional<CharacterState> locked = save.companions.stream()
+                    .filter(c -> region.companionId().equals(c.id))
+                    .filter(c -> !c.unlocked)
+                    .findFirst();
+            if (locked.isPresent()) {
+                CharacterState companion = locked.get();
+                companion.unlocked = true;
+                if (save.party.size() < 3) {
+                    save.party.add(companion);
+                }
+                addCodex(save, companion.name);
+                return "你在" + region.name() + "偶遇道友 " + companion.name + "，对方决定与你同行。";
+            }
+        }
         Optional<CharacterState> locked = save.companions.stream().filter(c -> !c.unlocked).findFirst();
-        if (locked.isPresent()) {
+        if (locked.isPresent() && region == null) {
             CharacterState companion = locked.get();
             companion.unlocked = true;
             if (save.party.size() < 3) {
@@ -901,7 +949,7 @@ public class GameService {
         if (hasAdvantage(actor.element, target.element)) {
             damage = damage * 6 / 5;
         }
-        target.hp = Math.max(0, target.hp - damage);
+        damage = applyDamage(target, damage);
         logs.add(actor.name + " 使用 " + skill.name + " 攻击 " + target.name + "，造成 " + damage + " 伤害。");
         if (!skill.status.isBlank() && alive(target) && random.nextInt(100) < 45) {
             target.statuses.put(skill.status, skill.statusTurns);
@@ -914,8 +962,17 @@ public class GameService {
         if (hasAdvantage(actor.element, target.element)) {
             damage = damage * 6 / 5;
         }
-        target.hp = Math.max(0, target.hp - damage);
+        damage = applyDamage(target, damage);
         logs.add(actor.name + " 普通攻击 " + target.name + "，造成 " + damage + " 伤害。");
+    }
+
+    private int applyDamage(CharacterState target, int damage) {
+        int finalDamage = Math.max(1, damage);
+        if (target.statuses.getOrDefault("护盾", 0) > 0) {
+            finalDamage = Math.max(1, finalDamage * 65 / 100);
+        }
+        target.hp = Math.max(0, target.hp - finalDamage);
+        return finalDamage;
     }
 
     private void performTreasure(CharacterState actor, CharacterState target, MagicTreasureDef treasure, List<String> logs) {
@@ -935,8 +992,54 @@ public class GameService {
                 target.mp = Math.min(target.maxMp, target.mp + amount);
                 logs.add(actor.name + " 使用 " + treasure.name + "，为 " + target.name + " 恢复 " + amount + " 灵力。");
             }
+            case "heal_mp" -> {
+                int hp = target.maxHp * treasure.power / 100;
+                int mp = target.maxMp * treasure.power / 100;
+                target.hp = Math.min(target.maxHp, target.hp + hp);
+                target.mp = Math.min(target.maxMp, target.mp + mp);
+                logs.add(actor.name + " 使用 " + treasure.name + "，为 " + target.name + " 恢复体力和灵力。");
+            }
+            case "cleanse" -> {
+                target.statuses.remove("中毒");
+                target.statuses.remove("灼烧");
+                target.statuses.remove("减速");
+                target.statuses.remove("眩晕");
+                target.statuses.remove("束缚");
+                logs.add(actor.name + " 使用 " + treasure.name + "，驱散了 " + target.name + " 的异常状态。");
+            }
+            case "revive" -> {
+                if (alive(target)) {
+                    int amount = target.maxHp * treasure.power / 100;
+                    target.hp = Math.min(target.maxHp, target.hp + amount);
+                    logs.add(actor.name + " 使用 " + treasure.name + "，为 " + target.name + " 稳住气息，恢复 " + amount + " 体力。");
+                } else {
+                    target.hp = Math.max(1, target.maxHp * treasure.power / 100);
+                    target.statuses.clear();
+                    logs.add(actor.name + " 使用 " + treasure.name + "，复活了 " + target.name + "。");
+                }
+            }
+            case "shield" -> {
+                target.statuses.put("护盾", Math.max(1, treasure.power));
+                logs.add(actor.name + " 使用 " + treasure.name + "，为 " + target.name + " 附加护盾" + Math.max(1, treasure.power) + "回合。");
+            }
+            case "attack_buff" -> applyBuff(actor, target, treasure, logs, "巨力");
+            case "magic_buff" -> applyBuff(actor, target, treasure, logs, "凝神");
+            case "defense_buff" -> applyBuff(actor, target, treasure, logs, "金刚");
+            case "agility_buff" -> applyBuff(actor, target, treasure, logs, "神行");
+            case "all_buff" -> applyBuff(actor, target, treasure, logs, "天罡");
+            case "drain_hp" -> {
+                int damage = applyDamage(target, Math.max(1, totalMagic(actor) * treasure.power / 100 - totalDefense(target) / 3));
+                int heal = Math.max(1, damage / 2);
+                actor.hp = Math.min(actor.maxHp, actor.hp + heal);
+                logs.add(actor.name + " 使用 " + treasure.name + " 抽取 " + target.name + "，造成 " + damage + " 伤害并恢复 " + heal + " 体力。");
+            }
             default -> logs.add(actor.name + " 使用 " + treasure.name + "，但法宝没有生效。");
         }
+    }
+
+    private void applyBuff(CharacterState actor, CharacterState target, MagicTreasureDef treasure, List<String> logs, String status) {
+        target.statuses.put(status, Math.max(1, treasure.power));
+        logs.add(actor.name + " 使用 " + treasure.name + "，使 " + target.name + " 获得" + status + "状态" + Math.max(1, treasure.power) + "回合。");
     }
 
     private ItemDef trialManual(String element) {
@@ -962,6 +1065,13 @@ public class GameService {
         return characters.stream().filter(c -> c.id.equals(id)).filter(this::alive).findFirst().orElse(null);
     }
 
+    private CharacterState findTreasureAllyTarget(List<CharacterState> characters, String id, MagicTreasureDef treasure) {
+        if ("revive".equals(treasure.effectType)) {
+            return characters.stream().filter(c -> c.id.equals(id)).findFirst().orElse(null);
+        }
+        return findLivingById(characters, id);
+    }
+
     private CharacterState firstLiving(List<CharacterState> characters) {
         return characters.stream().filter(this::alive).findFirst().orElse(null);
     }
@@ -972,7 +1082,7 @@ public class GameService {
         }
         BattleResult result = new BattleResult();
         result.title = title;
-        List<CharacterState> enemies = createEnemies(difficulty, Math.max(1, save.party.size()));
+        List<CharacterState> enemies = createEnemies(save, difficulty, Math.max(1, save.party.size()));
         for (CharacterState enemy : enemies) {
             addCodex(save, enemy.name);
         }
@@ -1094,6 +1204,12 @@ public class GameService {
             tickStatus(actor, "灼烧");
         }
         tickStatus(actor, "减速");
+        tickStatus(actor, "护盾");
+        tickStatus(actor, "巨力");
+        tickStatus(actor, "凝神");
+        tickStatus(actor, "金刚");
+        tickStatus(actor, "神行");
+        tickStatus(actor, "天罡");
     }
 
     private void tickStatus(CharacterState actor, String status) {
@@ -1105,26 +1221,93 @@ public class GameService {
         }
     }
 
-    private List<CharacterState> createEnemies(int difficulty, int count) {
-        List<String> names = List.of("黑风寨匪徒", "银月妖狼", "鬼灵门邪修", "赤炎虎王", "石巨人");
+    private AdventureRegion adventureRegion(String regionId) {
+        if (regionId == null || regionId.isBlank()) {
+            return ADVENTURE_REGIONS.get(0);
+        }
+        return ADVENTURE_REGIONS.stream()
+                .filter(region -> region.id().equals(regionId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("地图区域不存在"));
+    }
+
+    private AdventureRegion battleRegion(GameSave save, int difficulty) {
+        if (difficulty <= 0) {
+            return adventureRegion(null);
+        }
+        AdventureRegion selected = ADVENTURE_REGIONS.get(0);
+        for (AdventureRegion region : ADVENTURE_REGIONS) {
+            if (difficulty >= region.minLevel()) {
+                selected = region;
+            }
+        }
+        return selected;
+    }
+
+    private AdventureRegion regionFromBattleType(String battleType) {
+        if (battleType == null || !battleType.startsWith("adventure_")) {
+            return null;
+        }
+        String regionId = battleType.substring("adventure_".length());
+        return ADVENTURE_REGIONS.stream()
+                .filter(region -> region.id().equals(regionId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String companionName(String companionId) {
+        return switch (companionId) {
+            case "companion_nangongwan" -> "南宫婉";
+            case "companion_chenqiaoqian" -> "陈巧倩";
+            case "companion_yuanyao" -> "元瑶";
+            case "companion_ziling" -> "紫灵";
+            case "companion_mupeiling" -> "慕沛灵";
+            case "companion_lifeiyu" -> "厉飞雨";
+            case "companion_qiyunxiao" -> "齐云霄";
+            case "companion_mojiao" -> "墨蛟";
+            case "companion_xiangzhili" -> "向之礼";
+            case "companion_fengxi" -> "风希";
+            default -> "未知道友";
+        };
+    }
+
+    private int mainLevel(GameSave save) {
+        return Math.max(1, save.party.isEmpty() ? 1 : save.party.get(0).level);
+    }
+
+    private int enemyLevelNearPlayer(int playerLevel, int difficulty) {
+        int target = playerLevel + random.nextInt(11) - 5;
+        if (difficulty > playerLevel) {
+            target += Math.min(3, Math.max(0, difficulty - playerLevel) / 5);
+        } else if (difficulty < playerLevel) {
+            target -= Math.min(2, Math.max(0, playerLevel - difficulty) / 6);
+        }
+        return Math.max(1, Math.min(playerLevel + 5, Math.max(playerLevel - 5, target)));
+    }
+
+    private List<CharacterState> createEnemies(GameSave save, int difficulty, int count) {
+        AdventureRegion region = battleRegion(save, difficulty);
+        List<String> names = region.enemies();
+        int playerLevel = mainLevel(save);
         List<CharacterState> enemies = new ArrayList<>();
         for (int i = 0; i < Math.min(3, count); i++) {
             String element = Catalog.ELEMENTS.get((difficulty + i) % Catalog.ELEMENTS.size());
+            int enemyLevel = enemyLevelNearPlayer(playerLevel, difficulty + i);
             CharacterState enemy = new CharacterState();
             enemy.id = "enemy_" + i + "_" + random.nextInt(9999);
-            enemy.name = names.get((difficulty + i) % names.size());
+            enemy.name = names.get(Math.floorMod(difficulty + i + random.nextInt(names.size()), names.size()));
             enemy.gender = "未知";
             enemy.element = element;
             enemy.avatar = enemyAvatar(enemy.name);
-            enemy.level = difficulty;
-            enemy.maxHp = 70 + difficulty * 22;
+            enemy.level = enemyLevel;
+            enemy.maxHp = 70 + enemyLevel * 22;
             enemy.hp = enemy.maxHp;
-            enemy.maxMp = 35 + difficulty * 8;
+            enemy.maxMp = 35 + enemyLevel * 8;
             enemy.mp = enemy.maxMp;
-            enemy.attack = 14 + difficulty * 4;
-            enemy.magic = 14 + difficulty * 4;
-            enemy.defense = 8 + difficulty * 3;
-            enemy.agility = 8 + difficulty * 2 + i;
+            enemy.attack = 14 + enemyLevel * 4;
+            enemy.magic = 14 + enemyLevel * 4;
+            enemy.defense = 8 + enemyLevel * 3;
+            enemy.agility = 8 + enemyLevel * 2 + i;
             enemy.skills.addAll(Catalog.initialSkills(element));
             enemies.add(enemy);
         }
@@ -1144,13 +1327,13 @@ public class GameService {
         boss.element = wanmo ? "火" : "水";
         boss.avatar = wanmo ? "boss_wanmo.png" : "boss_xianling.png";
         boss.level = difficulty + 5;
-        boss.maxHp = 260 + difficulty * 55;
+        boss.maxHp = 520 + difficulty * 95;
         boss.hp = boss.maxHp;
-        boss.maxMp = 120 + difficulty * 18;
+        boss.maxMp = 160 + difficulty * 22;
         boss.mp = boss.maxMp;
-        boss.attack = 34 + difficulty * 6;
-        boss.magic = 42 + difficulty * 7;
-        boss.defense = 22 + difficulty * 5;
+        boss.attack = 38 + difficulty * 7;
+        boss.magic = 48 + difficulty * 8;
+        boss.defense = 26 + difficulty * 6;
         boss.agility = 16 + difficulty * 2;
         boss.skills.addAll(Catalog.initialSkills(boss.element));
         return boss;
@@ -1211,10 +1394,25 @@ public class GameService {
     private String enemyAvatar(String name) {
         return switch (name) {
             case "黑风寨匪徒" -> "enemy_bandit.png";
-            case "银月妖狼" -> "enemy_wolf.png";
+            case "血煞门邪修" -> "enemy_blood_cultivator.png";
+            case "魔焰宗修士" -> "enemy_flame_cultivator.png";
             case "鬼灵门邪修" -> "enemy_cultivator.png";
+            case "百鬼窟巫师" -> "enemy_ghost_wizard.png";
+            case "白骨老魔" -> "enemy_bone_demon.png";
+            case "银月妖狼" -> "enemy_wolf.png";
             case "赤炎虎王" -> "enemy_tiger.png";
+            case "金背妖熊" -> "enemy_bear.png";
+            case "血玉妖藤" -> "enemy_blood_vine.png";
+            case "幻灵花妖" -> "enemy_flower_demon.png";
+            case "千年树精" -> "enemy_tree_spirit.png";
+            case "寒玉蟾蜍" -> "enemy_ice_toad.png";
+            case "玄冰蛇妖" -> "enemy_ice_snake.png";
+            case "深海章鱼" -> "enemy_octopus.png";
+            case "地火蜥蜴" -> "enemy_fire_lizard.png";
+            case "熔岩巨兽" -> "enemy_lava_giant.png";
             case "石巨人" -> "enemy_stone_giant.png";
+            case "山岩巨怪" -> "enemy_rock_monster.png";
+            case "土行怪" -> "enemy_earth_creature.png";
             default -> "enemy_default.png";
         };
     }
@@ -1246,23 +1444,35 @@ public class GameService {
     }
 
     private int totalAttack(CharacterState character) {
-        return character.attack + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.attack).sum();
+        int value = character.attack + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.attack).sum();
+        return value * buffPercent(character, "巨力") / 100;
     }
 
     private int totalMagic(CharacterState character) {
-        return character.magic + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.magic).sum();
+        int value = character.magic + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.magic).sum();
+        return value * buffPercent(character, "凝神") / 100;
     }
 
     private int totalDefense(CharacterState character) {
-        return character.defense + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.defense).sum();
+        int value = character.defense + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.defense).sum();
+        return value * buffPercent(character, "金刚") / 100;
     }
 
     private int totalAgility(CharacterState character) {
         int value = character.agility + affectionBonus(character) + character.equipment.values().stream().map(Catalog.EQUIPMENT::get).filter(e -> e != null).mapToInt(e -> e.agility).sum();
+        value = value * buffPercent(character, "神行") / 100;
         if (character.statuses.getOrDefault("减速", 0) > 0) {
             value /= 2;
         }
         return value;
+    }
+
+    private int buffPercent(CharacterState character, String status) {
+        int percent = character.statuses.getOrDefault("天罡", 0) > 0 ? 125 : 100;
+        if (character.statuses.getOrDefault(status, 0) > 0) {
+            percent += "金刚".equals(status) ? 35 : 30;
+        }
+        return percent;
     }
 
     private boolean hasAdvantage(String attacker, String defender) {
@@ -1302,8 +1512,12 @@ public class GameService {
     private BossDifficulty bossDifficulty(String difficulty) {
         return switch (difficulty == null ? "" : difficulty) {
             case "easy" -> new BossDifficulty("easy", "简单", 8);
+            case "normal" -> new BossDifficulty("normal", "普通", 14);
             case "hard" -> new BossDifficulty("hard", "困难", 22);
             case "nightmare" -> new BossDifficulty("nightmare", "噩梦", 30);
+            case "hell" -> new BossDifficulty("hell", "地狱", 40);
+            case "purgatory" -> new BossDifficulty("purgatory", "炼狱", 52);
+            case "immortal" -> new BossDifficulty("immortal", "仙劫", 65);
             default -> new BossDifficulty("normal", "普通", 14);
         };
     }
@@ -1312,6 +1526,9 @@ public class GameService {
     }
 
     private record BossDifficulty(String id, String name, int level) {
+    }
+
+    private record AdventureRegion(String id, String name, int minLevel, List<String> enemies, String companionId) {
     }
 
     private void normalizeSave(GameSave save) {

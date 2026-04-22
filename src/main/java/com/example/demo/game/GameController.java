@@ -63,6 +63,7 @@ public class GameController {
         data.put("equipment", Catalog.EQUIPMENT);
         data.put("treasures", Catalog.TREASURES);
         data.put("elements", Catalog.ELEMENTS);
+        data.put("maps", gameService.adventureRegions());
         return data;
     }
 
@@ -132,8 +133,8 @@ public class GameController {
     }
 
     @PostMapping("/{id}/adventure")
-    public BattleSession adventure(@PathVariable String id) {
-        return gameService.startAdventure(id);
+    public BattleSession adventure(@PathVariable String id, @RequestBody(required = false) SimpleRequest request) {
+        return gameService.startAdventure(id, request == null ? null : request.regionId);
     }
 
     @PostMapping("/{id}/battle/tower/start")

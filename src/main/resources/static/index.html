@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>凡人修仙外传 v0.4</title>
+    <title>凡人修仙外传 v0.5</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -34,8 +34,28 @@
         }
         h1, h2, h3 { margin: 0; font-weight: 700; letter-spacing: 0; }
         h1 { font-size: clamp(2.2rem, 6vw, 4.6rem); line-height: 1.05; }
-        .app { max-width: 1320px; margin: 0 auto; padding: 1.2rem; }
+        .app { min-height: 100vh; }
+        .game-shell { max-width: 1320px; margin: 0 auto; padding: 1.2rem; }
         .menu { min-height: calc(100vh - 2.4rem); display: grid; place-items: center; }
+        .main-menu {
+            position: relative;
+            margin: 0;
+            min-height: 100vh;
+            width: 100%;
+            padding: 1.2rem;
+            overflow: hidden;
+            background:
+                linear-gradient(rgba(248, 247, 241, 0.28), rgba(248, 247, 241, 0.42)),
+                url("/assets/images/main_menu_bg.png") center / cover no-repeat;
+        }
+        .main-menu::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: rgba(255, 253, 247, 0.18);
+            pointer-events: none;
+        }
+        .main-menu > * { position: relative; z-index: 1; }
         .title-block {
             width: min(560px, 100%);
             text-align: center;
@@ -241,12 +261,14 @@
 </head>
 <body>
 <div id="app" class="app">
-    <audio ref="bgm" src="/assets/audio/main_bgm.mp3" loop preload="auto"></audio>
-    <main v-if="screen === 'menu'" class="menu">
+    <audio ref="bgm" loop preload="auto" @error="handleMusicError">
+        <source src="/assets/audio/main_bgm.mp3" type="audio/mpeg">
+    </audio>
+    <main v-if="screen === 'menu'" class="menu main-menu">
         <button class="music-toggle" @click="toggleMusic">{{ musicLabel }}</button>
         <section class="title-block">
-            <h1>凡人修仙外传</h1>
-            <p class="subtitle">v0.4 网页端单机修仙回合制</p>
+            <p class="subtitle">v0.5 网页端单机修仙回合制</p>
+            <p v-if="message" class="message">{{ message }}</p>
             <div class="stack">
                 <button @click="screen = 'create'">新的旅程</button>
                 <button @click="openLoad">读取进度</button>
@@ -256,7 +278,7 @@
         </section>
     </main>
 
-    <main v-else-if="screen === 'create'" class="menu">
+    <main v-else-if="screen === 'create'" class="menu main-menu">
         <section class="title-block form">
             <h2>角色创建</h2>
             <p class="subtitle">一名散修，从太南山启程。</p>
@@ -293,7 +315,7 @@
         </section>
     </main>
 
-    <main v-else-if="screen === 'load'" class="menu">
+    <main v-else-if="screen === 'load'" class="menu main-menu">
         <section class="title-block">
             <h2>读取进度</h2>
             <p class="subtitle">选择一个自动存档继续。</p>
@@ -326,10 +348,10 @@
         </div>
     </main>
 
-    <main v-else-if="screen === 'about'" class="menu">
+    <main v-else-if="screen === 'about'" class="menu main-menu">
         <section class="title-block">
             <h2>关于游戏</h2>
-            <p class="subtitle">开发者：李涌 · 版本：v0.4 · 发布目标：头像、背景音乐、存档删除</p>
+            <p class="subtitle">开发者：李涌 · 版本：v0.5 · 发布目标：地图扩展、敌人扩展、法宝平衡、主菜单背景</p>
             <div class="stack">
                 <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、秘籍学习、法宝使用、五行试炼、境界突破。</p>
                 <button @click="screen = 'menu'">返回</button>
@@ -337,7 +359,7 @@
         </section>
     </main>
 
-    <main v-else>
+    <main v-else class="game-shell">
         <header class="topbar">
             <div class="topbar-left">
                 <button @click="screen = 'menu'">返回主菜单</button>
@@ -451,7 +473,7 @@
                                 <h3>选择目标</h3>
                                 <p v-if="pendingAction.action === 'treasure'" class="muted">{{ treasureName(currentActor.treasure) }}：{{ treasure(currentActor.treasure).description }}</p>
                                 <div class="grid two" style="margin-top: 0.65rem">
-                                    <button class="target-button" v-for="target in pendingTargets" :key="target.id" @click="submitBattleTarget(target.id)" :disabled="target.hp <= 0">
+                                    <button class="target-button" v-for="target in pendingTargets" :key="target.id" @click="submitBattleTarget(target.id)" :disabled="target.hp <= 0 && !canTargetDead(pendingAction)">
                                         {{ target.name }} · 体力 {{ target.hp }}/{{ target.maxHp }} · 灵力 {{ target.mp }}/{{ target.maxMp }}
                                     </button>
                                 </div>
@@ -599,7 +621,7 @@
                         <article class="card">
                             <h3>装备</h3>
                             <div class="list shop-list" style="margin-top: 0.65rem">
-                                <div v-for="eq in shop.equipment" :key="eq.id" class="card">
+                                <div v-for="eq in shopEquipmentItems" :key="eq.id" class="card">
                                     <div class="row">
                                         <strong :class="'quality-' + eq.quality">{{ eq.name }} · {{ eq.quality }}</strong>
                                         <span>{{ eq.price }}灵石</span>
@@ -613,7 +635,7 @@
                         <article class="card">
                             <h3>法宝</h3>
                             <div class="list shop-list" style="margin-top: 0.65rem">
-                                <div v-for="tr in shop.treasures" :key="tr.id" class="card">
+                                <div v-for="tr in shopTreasureItems" :key="tr.id" class="card">
                                     <div class="row">
                                         <strong :class="'quality-' + tr.quality">{{ tr.name }} · {{ tr.quality }}</strong>
                                         <span>{{ tr.price }}灵石</span>
@@ -764,7 +786,7 @@
 
             <aside class="panel nav">
                 <button @click="openInn">客栈</button>
-                <button @click="startAdventure" :disabled="!!battle && !battle.finished">地图探索</button>
+                <button @click="mapDialog = true" :disabled="!!battle && !battle.finished">地图探索</button>
                 <button @click="startTowerBattle" :disabled="!!battle && !battle.finished">锁妖塔</button>
                 <button @click="trialDialog = true" :disabled="!!battle && !battle.finished">五行洞</button>
                 <button @click="openBossDialog('wanmo')" :disabled="!!battle && !battle.finished">万魔窟</button>
@@ -857,6 +879,21 @@
             </section>
         </div>
 
+        <div v-if="mapDialog" class="modal-mask" @click.self="mapDialog = false">
+            <section class="modal">
+                <h3>地图探索</h3>
+                <p class="desc">选择要探索的区域。每个地图区域只会遇到一位固定道友，胜利后有机会触发结识事件。</p>
+                <p class="muted">当前主角等级：{{ playerLevel }}</p>
+                <div class="list" style="margin-top: 1rem">
+                    <button v-for="region in adventureMaps" :key="region.id" @click="startAdventure(region.id)" :disabled="playerLevel < region.minLevel">
+                        {{ region.name }}
+                        <span class="muted"> · 可遇道友：{{ region.companionName }}</span>
+                    </button>
+                </div>
+                <button style="margin-top: 1rem" @click="mapDialog = false">返回</button>
+            </section>
+        </div>
+
         <div v-if="trialDialog" class="modal-mask" @click.self="trialDialog = false">
             <section class="modal">
                 <h3>五行试炼洞</h3>
@@ -895,7 +932,7 @@ createApp({
             message: "",
             save: null,
             saves: [],
-            catalog: { skills: {}, items: {}, equipment: {}, treasures: {}, elements: ["金", "木", "水", "火", "土"] },
+            catalog: { skills: {}, items: {}, equipment: {}, treasures: {}, elements: ["金", "木", "水", "火", "土"], maps: [] },
             shop: { items: [], equipment: [], treasures: [] },
             battleResult: null,
             battle: null,
@@ -916,6 +953,7 @@ createApp({
             selectedTreasureId: null,
             manualDialog: false,
             selectedManualId: null,
+            mapDialog: false,
             trialDialog: false,
             bossDialog: false,
             selectedBoss: null,
@@ -934,6 +972,12 @@ createApp({
         realmList() {
             return ["炼气期", "筑基期", "金丹期", "元婴期", "化神期", "炼虚期", "合体期", "大乘期", "渡劫期", "真仙期"];
         },
+        playerLevel() {
+            return this.save?.party?.[0]?.level || 1;
+        },
+        adventureMaps() {
+            return this.catalog.maps || [];
+        },
         ownedPillItems() {
             return this.ownedItemsByCategory("pill");
         },
@@ -941,10 +985,16 @@ createApp({
             return this.ownedItemsByCategory("manual");
         },
         shopPillItems() {
-            return (this.shop.items || []).filter(item => item.category === "pill" || item.category === "breakthrough");
+            return this.sortByQualityAndPrice((this.shop.items || []).filter(item => item.category === "pill" || item.category === "breakthrough"));
         },
         shopManualItems() {
-            return (this.shop.items || []).filter(item => item.category === "manual");
+            return this.sortByQualityAndPrice((this.shop.items || []).filter(item => item.category === "manual"));
+        },
+        shopEquipmentItems() {
+            return this.sortByQualityAndPrice(this.shop.equipment || []);
+        },
+        shopTreasureItems() {
+            return this.sortByQualityAndPrice(this.shop.treasures || []);
         },
         buyTarget() {
             return this.catalog.items[this.selectedBuyId]
@@ -969,7 +1019,10 @@ createApp({
                 { id: "easy", name: "简单", level: 8 },
                 { id: "normal", name: "普通", level: 14 },
                 { id: "hard", name: "困难", level: 22 },
-                { id: "nightmare", name: "噩梦", level: 30 }
+                { id: "nightmare", name: "噩梦", level: 30 },
+                { id: "hell", name: "地狱", level: 40 },
+                { id: "purgatory", name: "炼狱", level: 52 },
+                { id: "immortal", name: "仙劫", level: 65 }
             ];
         },
         codexRewards() {
@@ -989,7 +1042,7 @@ createApp({
             const treasureNames = Object.values(this.catalog.treasures || {}).map(x => x.name);
             const skillNames = Object.values(this.catalog.skills || {}).map(x => x.name);
             const companionNames = (this.save?.companions || []).map(x => x.name);
-            const monsterNames = ["黑风寨匪徒", "银月妖狼", "鬼灵门邪修", "赤炎虎王", "石巨人"];
+            const monsterNames = this.monsterNames;
             const used = new Set();
             const take = (key, name, list) => {
                 list.forEach(x => used.add(x));
@@ -1005,6 +1058,13 @@ createApp({
             ];
             groups.push({ key: "progress", name: "进度统计", entries: entries.filter(x => !used.has(x)) });
             return groups;
+        },
+        monsterNames() {
+            return [
+                "黑风寨匪徒", "血煞门邪修", "魔焰宗修士", "鬼灵门邪修", "百鬼窟巫师", "白骨老魔",
+                "银月妖狼", "赤炎虎王", "金背妖熊", "血玉妖藤", "幻灵花妖", "千年树精",
+                "寒玉蟾蜍", "玄冰蛇妖", "深海章鱼", "地火蜥蜴", "熔岩巨兽", "石巨人", "山岩巨怪", "土行怪"
+            ];
         },
         currentCodex() {
             return this.codexGroups.find(x => x.key === this.codexTab) || this.codexGroups[0] || { name: "", entries: [] };
@@ -1066,6 +1126,19 @@ createApp({
         async loadShop() {
             this.shop = await this.request("/api/game/shop");
         },
+        qualityRank(quality) {
+            const index = ["凡品", "良品", "精品", "灵品", "仙品"].indexOf(quality ?? "");
+            return index >= 0 ? index : 99;
+        },
+        sortByQualityAndPrice(items) {
+            return [...items].sort((a, b) => {
+                const qa = this.qualityRank(a.quality);
+                const qb = this.qualityRank(b.quality);
+                if (qa !== qb) return qa - qb;
+                if ((a.price || 0) !== (b.price || 0)) return (a.price || 0) - (b.price || 0);
+                return (a.name || "").localeCompare(b.name || "", "zh-CN");
+            });
+        },
         async loadSaves() {
             this.saves = await this.request("/api/game/saves");
         },
@@ -1112,13 +1185,24 @@ createApp({
                 return;
             }
             try {
+                audio.volume = 0.55;
+                if (!audio.currentSrc) {
+                    audio.load();
+                }
                 await audio.play();
                 this.musicOn = true;
                 this.message = "";
             } catch (error) {
                 this.musicOn = false;
-                this.message = "音乐文件未找到，或浏览器需要你再次点击开启音乐。";
+                const code = audio.error ? `，错误码 ${audio.error.code}` : "";
+                this.message = `音乐播放失败${code}：${error?.message || "请确认文件格式为浏览器支持的 MP3，并在启动服务后刷新页面。"}`;
             }
+        },
+        handleMusicError() {
+            const audio = this.$refs.bgm;
+            const code = audio?.error ? `，错误码 ${audio.error.code}` : "";
+            this.musicOn = false;
+            this.message = `音乐文件加载失败${code}。请确认文件位于 src/main/resources/static/assets/audio/main_bgm.mp3，并重启服务后刷新页面。`;
         },
         openDeleteSave(save) {
             this.deleteSaveId = save.id;
@@ -1152,13 +1236,17 @@ createApp({
             this.innDialog = false;
             await this.safeUpdate(`/api/game/${this.save.id}/inn`, `客栈调息完成，花费 ${this.innCost} 灵石。`);
         },
-        async startAdventure() {
+        async startAdventure(regionId) {
             try {
-                this.battle = await this.request(`/api/game/${this.save.id}/adventure`, { method: "POST" });
+                this.mapDialog = false;
+                this.battle = await this.request(`/api/game/${this.save.id}/adventure`, {
+                    method: "POST",
+                    body: JSON.stringify({ regionId })
+                });
                 this.save = this.battle.save;
                 this.pendingAction = null;
                 this.battleActionMode = null;
-                this.message = "遭遇敌人，进入战斗。";
+                this.message = "地图探索遭遇敌人，进入战斗。";
                 this.battleResult = null;
                 await this.loadSaves();
             } catch (error) {
@@ -1482,6 +1570,9 @@ createApp({
             };
             this.battleActionMode = null;
         },
+        canTargetDead(action) {
+            return action?.action === "treasure" && this.treasure(action.treasureId).effectType === "revive";
+        },
         async submitBattleTarget(targetId) {
             if (!this.pendingAction) return;
             await this.submitBattleAction({ ...this.pendingAction, targetId });
@@ -1556,7 +1647,7 @@ createApp({
             if (skill) return `${skill.element}属性功法，${this.damageTypeName(skill.type)}类型，威力${skill.power}%，消耗${skill.mpCost}灵力。`;
             const companion = (this.save?.companions || []).find(x => x.name === entry);
             if (companion) return `${companion.element}属性道友，已在旅途中与你结识。`;
-            if (["黑风寨匪徒", "银月妖狼", "鬼灵门邪修", "赤炎虎王", "石巨人"].includes(entry)) return "太南山与锁妖塔中记录过的敌人。";
+            if (this.monsterNames.includes(entry)) return "地图探索、锁妖塔或五行试炼中记录过的敌人。";
             return "修仙路上已经记录的关键进度。";
         }
     }

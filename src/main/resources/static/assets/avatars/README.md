@@ -38,10 +38,25 @@ src/main/resources/static/assets/avatars
 ### Normal Enemies
 
 - `enemy_bandit.png` - 黑风寨匪徒
-- `enemy_wolf.png` - 银月妖狼
+- `enemy_blood_cultivator.png` - 血煞门邪修
+- `enemy_flame_cultivator.png` - 魔焰宗修士
 - `enemy_cultivator.png` - 鬼灵门邪修
+- `enemy_ghost_wizard.png` - 百鬼窟巫师
+- `enemy_bone_demon.png` - 白骨老魔
+- `enemy_wolf.png` - 银月妖狼
 - `enemy_tiger.png` - 赤炎虎王
+- `enemy_bear.png` - 金背妖熊
+- `enemy_blood_vine.png` - 血玉妖藤
+- `enemy_flower_demon.png` - 幻灵花妖
+- `enemy_tree_spirit.png` - 千年树精
+- `enemy_ice_toad.png` - 寒玉蟾蜍
+- `enemy_ice_snake.png` - 玄冰蛇妖
+- `enemy_octopus.png` - 深海章鱼
+- `enemy_fire_lizard.png` - 地火蜥蜴
+- `enemy_lava_giant.png` - 熔岩巨兽
 - `enemy_stone_giant.png` - 石巨人
+- `enemy_rock_monster.png` - 山岩巨怪
+- `enemy_earth_creature.png` - 土行怪
 - `enemy_default.png` - 未配置专属头像的普通敌人
 
 ### World Bosses
