@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>凡人修仙外传 v0.62</title>
+    <title>凡人修仙外传 v0.63</title>
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <style>
         * { box-sizing: border-box; }
@@ -298,7 +298,7 @@
     <main v-if="screen === 'menu'" class="menu main-menu">
         <button class="music-toggle" @click="toggleMusic">{{ musicLabel }}</button>
         <section class="title-block">
-            <p class="subtitle">v0.62 网页端单机修仙回合制</p>
+            <p class="subtitle">v0.63 网页端单机修仙回合制</p>
             <p v-if="message" class="message">{{ message }}</p>
             <div class="stack">
                 <button @click="screen = 'create'">新的旅程</button>
@@ -382,7 +382,7 @@
     <main v-else-if="screen === 'about'" class="menu main-menu">
         <section class="title-block">
             <h2>关于游戏</h2>
-            <p class="subtitle">开发者：李涌 · 版本：v0.62 · 发布目标：道友进度同步、阵容切换稳定性</p>
+            <p class="subtitle">开发者：李涌 · 版本：v0.63 · 发布目标：品质颜色显示完善、快速启动脚本</p>
             <div class="stack">
                 <p>核心玩法：单人起步、探索结识道友、3v3 回合制战斗、五行相克、秘籍学习、法宝使用、五行试炼、境界突破。</p>
                 <button @click="screen = 'menu'">返回</button>
@@ -707,7 +707,9 @@
                                 <div class="compact-card" v-for="slot in equipmentSlots" :key="slot.key">
                                     <div class="row">
                                         <strong>{{ slot.name }}</strong>
-                                        <span>{{ role.equipment?.[slot.key] ? equipmentName(role.equipment[slot.key]) : '未装备' }}</span>
+                                        <span :class="role.equipment?.[slot.key] ? 'quality-' + equipment(role.equipment[slot.key]).quality : ''">
+                                            {{ role.equipment?.[slot.key] ? equipmentName(role.equipment[slot.key]) : '未装备' }}
+                                        </span>
                                         <button v-if="role.equipment?.[slot.key]" @click="unequipRole(role.id, slot.key)">卸下</button>
                                     </div>
                                     <p v-if="role.equipment?.[slot.key]" class="muted">{{ equipmentStats(role.equipment[slot.key]) }}</p>
@@ -738,7 +740,12 @@
                     <div class="grid two" style="margin-top: 0.85rem">
                         <article class="card" v-for="role in save.party" :key="role.id">
                             <h3>{{ role.name }}</h3>
-                            <p class="muted">当前法宝：{{ role.treasure ? treasureName(role.treasure) : '未装备' }}</p>
+                            <p class="muted">
+                                当前法宝：
+                                <span :class="role.treasure ? 'quality-' + treasure(role.treasure).quality : ''">
+                                    {{ role.treasure ? treasureName(role.treasure) : '未装备' }}
+                                </span>
+                            </p>
                             <p v-if="role.treasure" class="desc">{{ treasure(role.treasure).description }}</p>
                             <div class="row">
                                 <button v-if="role.treasure" @click="unequipTreasure(role.id)">卸下法宝</button>
@@ -839,7 +846,7 @@
                                 </div>
                                 <span v-else-if="codexItem(entry)" class="item-icon"><img :src="itemIconUrl(codexItem(entry).id)" :alt="entry" @error="hideBrokenAvatar"></span>
                                 <div>
-                                    <h3>{{ entry }}</h3>
+                                    <h3 :class="codexQualityClass(entry)">{{ entry }}</h3>
                                     <p class="muted">{{ currentCodex.name }}</p>
                                 </div>
                             </div>
@@ -1875,6 +1882,15 @@ createApp({
         },
         codexItem(entry) {
             return Object.values(this.catalog.items || {}).find(item => item.name === entry) || null;
+        },
+        codexQualityClass(entry) {
+            const equipment = Object.values(this.catalog.equipment || {}).find(item => item.name === entry);
+            if (equipment) return `quality-${equipment.quality}`;
+            const treasure = Object.values(this.catalog.treasures || {}).find(item => item.name === entry);
+            if (treasure) return `quality-${treasure.quality}`;
+            const item = this.codexItem(entry);
+            if (item) return `quality-${item.quality}`;
+            return "";
         },
         codexAvatar(entry) {
             const companion = this.codexCompanion(entry);
